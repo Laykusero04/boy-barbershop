@@ -1,90 +1,555 @@
+/* =========================================================
+   Boy Barbershop — Advanced UI/UX
+   Clear hierarchy, icons, and modern components
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/* ---- Tokens ---- */
+:root {
+  --bb-bg: #f8fafc;
+  --bb-surface: #ffffff;
+  --bb-surface-2: #f1f5f9;
+  --bb-text: #0f172a;
+  --bb-muted: #64748b;
+  --bb-border: #e2e8f0;
+  --bb-radius: 0.75rem;
+  --bb-radius-sm: 0.5rem;
+  --bb-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --bb-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --bb-shadow-lg: 0 10px 40px rgba(15, 23, 42, 0.1);
+
+  --bb-blue: #2563eb;
+  --bb-blue-hover: #1d4ed8;
+  --bb-blue-soft: rgba(37, 99, 235, 0.1);
+  --bb-blue-bg: rgba(37, 99, 235, 0.06);
+
+  --bb-emerald: #059669;
+  --bb-emerald-soft: rgba(5, 150, 105, 0.12);
+  --bb-amber: #d97706;
+  --bb-amber-soft: rgba(217, 119, 6, 0.12);
+  --bb-rose: #e11d48;
+  --bb-rose-soft: rgba(225, 29, 72, 0.1);
+
+  --bb-brown: #8b5e34;
+  --bb-brown-soft: rgba(139, 94, 52, 0.12);
+}
+
+html[data-bs-theme="dark"],
+body.bb-dark {
+  --bb-bg: #0f172a;
+  --bb-surface: #1e293b;
+  --bb-surface-2: #334155;
+  --bb-text: #f1f5f9;
+  --bb-muted: #94a3b8;
+  --bb-border: rgba(148, 163, 184, 0.2);
+  --bb-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --bb-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --bb-shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.3);
+
+  --bb-blue: #60a5fa;
+  --bb-blue-hover: #3b82f6;
+  --bb-blue-soft: rgba(96, 165, 250, 0.15);
+  --bb-blue-bg: rgba(96, 165, 250, 0.08);
+
+  --bb-emerald: #34d399;
+  --bb-emerald-soft: rgba(52, 211, 153, 0.15);
+  --bb-amber: #fbbf24;
+  --bb-amber-soft: rgba(251, 191, 36, 0.15);
+  --bb-rose: #fb7185;
+  --bb-rose-soft: rgba(251, 113, 133, 0.15);
+  --bb-brown: #c08457;
+  --bb-brown-soft: rgba(192, 132, 87, 0.15);
+
+  /* Brighter muted text in dark mode for readability */
+  --bb-muted-strong: #cbd5e1;
+}
+
+/* ---- Base ---- */
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background-color: #f7f3ea; /* dirty white base (60%) */
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--bb-bg);
+  color: var(--bb-text);
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
-.bb-navbar {
-  background: #1f2937; /* dark base behind logo */
-}
-
+/* ---- Navbar ---- */
 .bb-navbar-inner {
-  max-width: 1200px;
+  max-width: 1280px;
 }
 
 .bb-logo-wrap {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.75rem;
 }
 
 .bb-logo-wrap img {
-  height: 40px;
+  height: 42px;
   width: auto;
+  border-radius: var(--bb-radius-sm);
 }
 
 .bb-brand {
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 1.1rem;
 }
 
 .bb-brand span {
   display: block;
-  font-size: 0.75rem;
-  letter-spacing: 0.12em;
-  opacity: 0.7;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  font-weight: 500;
 }
 
+/* Dark mode toggle (switch style) */
+.bb-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--bb-radius);
+  background: var(--bb-surface-2);
+  border: 1px solid var(--bb-border);
+}
+
+.bb-theme-toggle .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  border-radius: var(--bb-radius-sm);
+}
+
+.bb-theme-toggle .btn.active {
+  background: var(--bb-blue);
+  border-color: var(--bb-blue);
+  color: #fff;
+}
+
+/* ---- Shell & layout ---- */
 .bb-shell {
   min-height: 100vh;
+  padding-top: 0.5rem;
 }
 
-.bb-sidebar {
-  min-width: 240px;
+.bb-sidebar .card {
+  border-radius: var(--bb-radius);
+  box-shadow: var(--bb-shadow);
+  overflow: hidden;
 }
 
 .bb-sidebar .card-body {
-  background: #f0e5d4; /* softer dirty white */
+  background: var(--bb-surface);
+  padding: 1rem 0.75rem;
 }
 
 .bb-sidebar .nav-link {
-  border-radius: 0.75rem;
+  border-radius: var(--bb-radius-sm);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding-inline: 0.9rem;
-  color: #3b2a18;
+  gap: 0.65rem;
+  padding: 0.6rem 0.9rem;
+  color: var(--bb-text);
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.bb-sidebar .nav-link:hover:not(.disabled) {
-  background-color: #c4d5f8; /* light blue hover */
+.bb-sidebar .nav-link .bi {
+  font-size: 1.1rem;
+  opacity: 0.85;
+  width: 1.25rem;
+  text-align: center;
+}
+
+.bb-sidebar .nav-link:hover:not(.active):not(.disabled) {
+  background-color: var(--bb-blue-soft);
+  color: var(--bb-blue);
 }
 
 .bb-sidebar .nav-link.active {
-  background: #2563eb; /* blue accent (20%) */
-  color: #f9fafb;
+  background: var(--bb-blue);
+  color: #fff;
 }
 
+.bb-sidebar .nav-link.active .bi {
+  opacity: 1;
+}
+
+.bb-sidebar .bb-nav-sub {
+  padding-left: 2rem;
+  font-size: 0.9rem;
+}
+
+.bb-sidebar .bb-nav-sub .bi {
+  font-size: 1rem;
+}
+
+.bb-sidebar .text-muted {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+  padding: 0 0.5rem;
+}
+
+/* ---- Main content area ---- */
 .bb-main {
-  background: radial-gradient(circle at top left, #f7f3ea, #f0e5d4);
+  background: var(--bb-bg);
 }
 
 .bb-main-card {
-  border-radius: 1rem;
-  background-color: #fffaf2;
+  border-radius: var(--bb-radius);
+  background-color: var(--bb-surface);
+  box-shadow: var(--bb-shadow);
+  border: 1px solid var(--bb-border);
 }
 
-.bb-footer {
+.bb-main-card .card-body {
+  padding: 1.5rem;
+}
+
+/* ---- Page titles ---- */
+.bb-page-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--bb-text);
+  margin-bottom: 0.25rem;
+}
+
+.bb-page-subtitle {
+  font-size: 0.875rem;
+  color: var(--bb-muted);
+  margin-bottom: 0;
+}
+
+/* ---- KPI / stat cards ---- */
+.bb-stat-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.bb-stat-card {
+  background: var(--bb-surface);
+  border: 1px solid var(--bb-border);
+  border-radius: var(--bb-radius);
+  padding: 1rem;
+  box-shadow: var(--bb-shadow);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.bb-stat-card:hover {
+  box-shadow: var(--bb-shadow-md);
+}
+
+.bb-stat-card .bb-stat-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--bb-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.bb-stat-card .bb-stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bb-muted);
+  margin-bottom: 0.2rem;
+}
+
+.bb-stat-card .bb-stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--bb-text);
+  line-height: 1.2;
+}
+
+.bb-stat-card .bb-stat-value small {
+  font-weight: 500;
   font-size: 0.8rem;
-  color: #6b4b2a;
+  color: var(--bb-muted);
 }
 
+/* Section cards with header */
+.bb-section-card {
+  border: 1px solid var(--bb-border);
+  border-radius: var(--bb-radius);
+  box-shadow: var(--bb-shadow);
+  overflow: hidden;
+  background: var(--bb-surface);
+}
+
+.bb-section-card .card-body {
+  padding: 1.25rem;
+}
+
+.bb-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bb-section-title .bi {
+  font-size: 1.1rem;
+  color: var(--bb-blue);
+}
+
+.bb-section-subtitle {
+  font-size: 0.8rem;
+  color: var(--bb-muted);
+  margin-bottom: 0;
+}
+
+/* Action / quick-link cards */
+.bb-action-card {
+  border: 1px solid var(--bb-border);
+  border-radius: var(--bb-radius);
+  padding: 1.25rem;
+  height: 100%;
+  background: var(--bb-surface);
+  box-shadow: var(--bb-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bb-action-card:hover {
+  border-color: var(--bb-blue);
+  box-shadow: 0 0 0 3px var(--bb-blue-soft);
+}
+
+.bb-action-card .bb-action-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--bb-radius-sm);
+  background: var(--bb-blue-bg);
+  color: var(--bb-blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.bb-action-card .bb-action-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--bb-muted);
+  margin-bottom: 0.35rem;
+}
+
+.bb-action-card .bb-action-desc {
+  font-size: 0.875rem;
+  color: var(--bb-text);
+  margin-bottom: 1rem;
+  line-height: 1.45;
+}
+
+/* ---- Buttons ---- */
 .btn-bb-primary {
-  background-color: #2563eb;
-  border-color: #2563eb;
+  background-color: var(--bb-blue);
+  border-color: var(--bb-blue);
+  color: #fff;
+  font-weight: 600;
 }
 
 .btn-bb-primary:hover {
-  background-color: #1d4ed8;
-  border-color: #1d4ed8;
+  background-color: var(--bb-blue-hover);
+  border-color: var(--bb-blue-hover);
+  color: #fff;
+}
+
+.btn-bb-primary .bi {
+  margin-right: 0.35rem;
+}
+
+/* ---- Forms ---- */
+.form-label {
+  font-weight: 500;
+  color: var(--bb-text);
+}
+
+.form-control, .form-select {
+  border-radius: var(--bb-radius-sm);
+  border-color: var(--bb-border);
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--bb-blue);
+  box-shadow: 0 0 0 3px var(--bb-blue-soft);
+}
+
+/* ---- Tables ---- */
+.table {
+  color: inherit;
+}
+
+.table thead th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bb-muted);
+  border-bottom-color: var(--bb-border);
+  padding: 0.75rem;
+}
+
+.table tbody td {
+  padding: 0.75rem;
+  vertical-align: middle;
+}
+
+html[data-bs-theme="dark"] .table > :not(caption) > * > *,
+body.bb-dark .table > :not(caption) > * > * {
+  background-color: transparent;
+  color: inherit;
+  border-color: var(--bb-border);
+}
+
+/* Dark mode: improve text contrast (labels, hints, table content) */
+html[data-bs-theme="dark"] .bb-main .text-muted,
+body.bb-dark .bb-main .text-muted {
+  color: var(--bb-muted-strong, #cbd5e1) !important;
+}
+
+html[data-bs-theme="dark"] .bb-main .table,
+body.bb-dark .bb-main .table {
+  color: var(--bb-text);
+}
+
+html[data-bs-theme="dark"] .bb-main .table thead th,
+body.bb-dark .bb-main .table thead th {
+  color: var(--bb-muted-strong, #cbd5e1);
+  font-weight: 600;
+}
+
+html[data-bs-theme="dark"] .bb-main .table tbody td,
+body.bb-dark .bb-main .table tbody td {
+  color: var(--bb-text);
+}
+
+html[data-bs-theme="dark"] .bb-main .form-label,
+body.bb-dark .bb-main .form-label {
+  color: var(--bb-muted-strong, #cbd5e1);
+}
+
+html[data-bs-theme="dark"] .bb-main .card-title,
+body.bb-dark .bb-main .card-title {
+  color: var(--bb-text);
+}
+
+html[data-bs-theme="dark"] .bb-main .card-body .small,
+body.bb-dark .bb-main .card-body .small {
+  color: var(--bb-muted-strong, #cbd5e1);
+}
+
+/* Dark: table row variants keep readable text */
+html[data-bs-theme="dark"] .bb-main .table-primary td,
+html[data-bs-theme="dark"] .bb-main .table-primary th,
+body.bb-dark .bb-main .table-primary td,
+body.bb-dark .bb-main .table-primary th {
+  background: rgba(96, 165, 250, 0.2);
+  color: var(--bb-text) !important;
+}
+
+html[data-bs-theme="dark"] .bb-main .table-success td,
+html[data-bs-theme="dark"] .bb-main .table-success th,
+body.bb-dark .bb-main .table-success td,
+body.bb-dark .bb-main .table-success th {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--bb-text) !important;
+}
+
+html[data-bs-theme="dark"] .bb-main .table-light td,
+html[data-bs-theme="dark"] .bb-main .table-light th,
+body.bb-dark .bb-main .table-light td,
+body.bb-dark .bb-main .table-light th {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--bb-text) !important;
+}
+
+/* ---- Badges ---- */
+.bb-badge-active {
+  background: var(--bb-emerald-soft) !important;
+  color: var(--bb-emerald) !important;
+  font-weight: 600;
+  border: none;
+}
+
+.bb-badge-inactive {
+  background: var(--bb-rose-soft) !important;
+  color: var(--bb-rose) !important;
+  font-weight: 600;
+  border: none;
+}
+
+/* ---- Empty state ---- */
+.bb-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--bb-muted);
+}
+
+.bb-empty .bi {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.5;
+}
+
+.bb-empty p {
+  margin-bottom: 0;
+  font-size: 0.9rem;
+}
+
+/* ---- Progress bar ---- */
+.progress {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--bb-surface-2);
+}
+
+.progress-bar {
+  border-radius: 999px;
+}
+
+/* ---- Insights cards (theme-aware for dark mode) ---- */
+.bb-insight-card {
+  border: 1px solid var(--bb-border);
+}
+
+.bb-insight-card-neutral {
+  background: var(--bb-surface-2);
+  color: var(--bb-text);
+}
+
+.bb-insight-card-neutral .text-muted {
+  color: var(--bb-muted) !important;
+}
+
+/* ---- Footer ---- */
+.bb-footer {
+  font-size: 0.75rem;
+  color: var(--bb-muted);
+}
+
+/* ---- Focus ---- */
+:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--bb-blue-soft) !important;
+}
+
+/* ---- Utility: icon + text ---- */
+.bb-icon-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }

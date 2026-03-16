@@ -134,9 +134,6 @@ Goal: Quality-of-life improvements and optional features.
 - **Better UI/UX:**
   - Responsive design.
   - Dark mode (if you want).
-- **User accounts / authentication:**
-  - Simple login for owner.
-  - (Future) logins per barber.
 
 **When Phase 6 is done:**  
 The system feels more **professional and complete**, but these are not required for basic use.
