@@ -44,6 +44,10 @@
 - **DB name:** `boy_barbershop`
 - **Connection:** `connection.php` — PDO, `utf8mb4`, exception mode, `FETCH_ASSOC`.
 
+### 3.1a Data integrity (foreign keys)
+
+- **sales:** `barber_id` → `barbers(id)`, `service_id` → `services(id)` with `ON DELETE RESTRICT` (applied via `files/apply_data_integrity.php` or `files/sql/data_integrity_foreign_keys.sql`). Prevents hard-deleting barbers/services that are used in sales; soft delete (deactivate) is used in the app.
+
 ### 3.1 Tables (inferred from code)
 
 | Table | Purpose |

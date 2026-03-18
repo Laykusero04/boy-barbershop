@@ -140,6 +140,14 @@ The system feels more **professional and complete**, but these are not required 
 
 ---
 
+## Data Integrity (tech upgrade)
+
+- **Foreign keys:** `sales.barber_id` → `barbers.id` and `sales.service_id` → `services.id` with `ON DELETE RESTRICT` so barbers/services that have sales cannot be hard-deleted.
+- **Soft delete:** Barbers and services use **deactivate** (`is_active = 0`) only; no `DELETE` in the app. The DB enforces that rows referenced by sales are never removed.
+- **Apply once:** Run `files/apply_data_integrity.php` (browser or CLI) or run `files/sql/data_integrity_foreign_keys.sql` in MySQL to add the constraints.
+
+---
+
 ## Recommended Order (Short Version)
 
 1. **Phase 1:** Core cashier, barbers, services, sales, and basic earnings.

@@ -106,6 +106,9 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
                         <a href="payment_methods.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'payment_methods.php' ? 'active' : ''; ?>">
                             <i class="bi bi-wallet2"></i><span>Payment methods</span>
                         </a>
+                        <a href="cash_flow.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'cash_flow.php' ? 'active' : ''; ?>">
+                            <i class="bi bi-cash-stack"></i><span>Cash flow</span>
+                        </a>
                         <a href="expenses.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'expenses.php' ? 'active' : ''; ?>">
                             <i class="bi bi-receipt"></i><span>Expenses</span>
                         </a>
@@ -114,6 +117,10 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
                         </a>
                         <a href="reports.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'reports.php' ? 'active' : ''; ?>">
                             <i class="bi bi-file-earmark-text"></i><span>Reports</span>
+                        </a>
+                        <span class="text-muted text-uppercase fw-semibold small mt-2">Insights</span>
+                        <a href="sales_intelligence.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'sales_intelligence.php' ? 'active' : ''; ?>">
+                            <i class="bi bi-graph-up-arrow"></i><span>Sales Intelligence</span>
                         </a>
                         <span class="text-muted text-uppercase fw-semibold small mt-2">Owner</span>
                         <a href="owner_insights.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'owner_insights.php' ? 'active' : ''; ?>">

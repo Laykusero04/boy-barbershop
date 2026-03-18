@@ -315,6 +315,74 @@ if ($insightMonthCount > 0) {
     }
 }
 
+// --- Smart alerts (passive intelligence) ---
+$smartAlerts = [];
+$todaySales = (float)($today['total_sales'] ?? 0);
+
+// Daily target (from Analytics / Peak)
+$dailyTarget = 0;
+try {
+    $stmt = $pdo->prepare('SELECT `value` FROM settings WHERE `key` = ?');
+    $stmt->execute(['daily_target']);
+    $r = $stmt->fetch();
+    $dailyTarget = $r ? (float)$r['value'] : 0;
+} catch (Throwable $e) {}
+
+if ($dailyTarget > 0 && $todaySales < $dailyTarget) {
+    $short = $dailyTarget - $todaySales;
+    $smartAlerts[] = [
+        'type' => 'target',
+        'message' => 'You are below daily target (₱' . number_format($short, 0) . ' to go).',
+        'link' => 'analytics.php?section=peak',
+        'icon' => 'bi-bullseye',
+    ];
+}
+
+// Low sales today vs average (last 30 days average daily sales)
+try {
+    $stmt = $pdo->prepare('SELECT COALESCE(SUM(price), 0) AS total FROM sales WHERE sale_datetime >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)');
+    $stmt->execute();
+    $last30Total = (float)($stmt->fetch()['total'] ?? 0);
+    $avgDailySales = $last30Total / 30;
+    if ($avgDailySales > 0 && $todaySales > 0 && $todaySales < $avgDailySales * 0.7) {
+        $pct = round((1 - $todaySales / $avgDailySales) * 100);
+        $smartAlerts[] = [
+            'type' => 'sales',
+            'message' => 'Low sales today vs average (' . $pct . '% below your usual).',
+            'link' => 'add_sale.php',
+            'icon' => 'bi-graph-down',
+        ];
+    }
+} catch (Throwable $e) {}
+
+// Inventory low
+try {
+    $lowStock = $pdo->query('SELECT item_name, stock_qty, low_stock_threshold FROM inventory_items WHERE is_active = 1 AND stock_qty <= low_stock_threshold')->fetchAll();
+    if (!empty($lowStock)) {
+        $names = array_map(function ($r) { return $r['item_name'] . ' (' . $r['stock_qty'] . ')'; }, array_slice($lowStock, 0, 3));
+        $smartAlerts[] = [
+            'type' => 'inventory',
+            'message' => 'Inventory low: ' . implode(', ', $names) . (count($lowStock) > 3 ? ' +' . (count($lowStock) - 3) . ' more' : '') . '.',
+            'link' => 'inventory.php',
+            'icon' => 'bi-box-seam',
+        ];
+    }
+} catch (Throwable $e) {}
+
+// Expenses unusually high (this month vs avg monthly)
+if ($insightMonthCount > 0 && $avgMonthlyExpenses > 0 && isset($insightsMonths[date('Y-m')])) {
+    $thisMonthExp = (float)$insightsMonths[date('Y-m')]['expenses'];
+    if ($thisMonthExp > $avgMonthlyExpenses * 1.2) {
+        $pct = round((($thisMonthExp - $avgMonthlyExpenses) / $avgMonthlyExpenses) * 100);
+        $smartAlerts[] = [
+            'type' => 'expenses',
+            'message' => 'Expenses unusually high this month (' . $pct . '% above average).',
+            'link' => 'expenses.php',
+            'icon' => 'bi-receipt',
+        ];
+    }
+}
+
 // List of today's sales
 $stmt = $pdo->prepare('
     SELECT s.id, s.price, s.sale_datetime, b.name AS barber_name, sv.name AS service_name
@@ -354,6 +422,29 @@ $earnings = $stmt->fetchAll();
     </div>
     <a href="reports.php" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-text"></i> Reports</a>
 </div>
+
+<?php if (!empty($smartAlerts)): ?>
+<div class="mb-4">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body py-2 px-3">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                <span class="text-muted small"><i class="bi bi-bell me-1"></i> Alerts</span>
+            </div>
+            <ul class="list-unstyled mb-0 small">
+                <?php foreach ($smartAlerts as $i => $alert): ?>
+                <li class="d-flex align-items-center gap-2 py-1 <?php echo $i < count($smartAlerts) - 1 ? 'border-bottom border-secondary border-opacity-25' : ''; ?>">
+                    <i class="bi <?php echo htmlspecialchars($alert['icon']); ?> text-warning"></i>
+                    <span class="flex-grow-1"><?php echo htmlspecialchars($alert['message']); ?></span>
+                    <?php if (!empty($alert['link'])): ?>
+                    <a href="<?php echo htmlspecialchars($alert['link']); ?>" class="btn btn-sm btn-outline-secondary">View</a>
+                    <?php endif; ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Today -->
 <div class="bb-section-card card mb-4">

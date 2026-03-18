@@ -22,12 +22,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $notes = trim($_POST['notes'] ?? '');
 
     if ($barberId && $serviceId && $price > 0) {
-        $stmt = $pdo->prepare('
-            INSERT INTO sales (barber_id, service_id, price, payment_method, notes)
-            VALUES (?, ?, ?, ?, ?)
-        ');
-        $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
-        $message = 'Sale added successfully.';
+        try {
+            $pdo->beginTransaction();
+
+            // Load inventory usage for this service (active items only)
+            $usageStmt = $pdo->prepare('
+                SELECT u.inventory_item_id, u.quantity_per_service, i.item_name, i.stock_qty
+                FROM service_inventory_usage u
+                JOIN inventory_items i ON i.id = u.inventory_item_id AND i.is_active = 1
+                WHERE u.service_id = ?
+            ');
+            $usageStmt->execute([$serviceId]);
+            $usages = $usageStmt->fetchAll();
+
+            $insufficientItem = null;
+            foreach ($usages as $u) {
+                $required = (float)$u['quantity_per_service'];
+                $stock = (float)$u['stock_qty'];
+                if ($stock < $required) {
+                    $insufficientItem = $u;
+                    break;
+                }
+            }
+
+            if ($insufficientItem !== null) {
+                $pdo->rollBack();
+                $message = 'Cannot add sale: insufficient stock for ' . htmlspecialchars($insufficientItem['item_name']) . ' (need ' . $insufficientItem['quantity_per_service'] . ', have ' . $insufficientItem['stock_qty'] . ').';
+            } else {
+                $stmt = $pdo->prepare('
+                    INSERT INTO sales (barber_id, service_id, price, payment_method, notes)
+                    VALUES (?, ?, ?, ?, ?)
+                ');
+                $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
+
+                $deductStmt = $pdo->prepare('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?');
+                foreach ($usages as $u) {
+                    $deductStmt->execute([(float)$u['quantity_per_service'], (int)$u['inventory_item_id']]);
+                }
+
+                $pdo->commit();
+                $message = 'Sale added successfully.';
+            }
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if (strpos($e->getMessage(), 'service_inventory_usage') !== false || strpos($e->getMessage(), "doesn't exist") !== false) {
+                $stmt = $pdo->prepare('INSERT INTO sales (barber_id, service_id, price, payment_method, notes) VALUES (?, ?, ?, ?, ?)');
+                $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
+                $message = 'Sale added successfully. (Run files/sql/service_inventory_usage.sql to enable inventory deduction.)';
+            } else {
+                $message = 'Error adding sale: ' . htmlspecialchars($e->getMessage());
+            }
+        }
     } else {
         $message = 'Please fill all required fields.';
     }
@@ -81,6 +128,18 @@ foreach ($breakdownRows as $r) {
     $breakdownByBarber[$bid]['total_count'] += $count;
     $breakdownByBarber[$bid]['total_sales'] += $sales;
 }
+
+// Last sale (for "Repeat last" and quick defaults)
+$lastSale = null;
+$lastSaleRow = $pdo->query('SELECT barber_id, service_id, price, payment_method FROM sales ORDER BY sale_datetime DESC LIMIT 1')->fetch();
+if ($lastSaleRow) {
+    $lastSale = [
+        'barber_id' => (int)$lastSaleRow['barber_id'],
+        'service_id' => (int)$lastSaleRow['service_id'],
+        'price' => (float)$lastSaleRow['price'],
+        'payment_method' => (string)($lastSaleRow['payment_method'] ?? ''),
+    ];
+}
 ?>
 <?php include 'partials/header.php'; ?>
 
@@ -104,10 +163,29 @@ foreach ($breakdownRows as $r) {
 <div class="bb-section-card card">
     <div class="card-body">
         <h5 class="bb-section-title mb-3"><i class="bi bi-plus-circle"></i> New sale</h5>
-        <form method="post" class="row g-3">
+
+        <?php if ($lastSale && count($services) > 0): ?>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <span class="text-muted small me-1">Quick add:</span>
+            <button type="button" id="bbRepeatLastBtn" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-repeat"></i> Repeat last sale
+            </button>
+            <?php
+            $quickServices = array_slice($services, 0, 6);
+            foreach ($quickServices as $sv):
+                $price = (float)($sv['default_price'] ?? 0);
+            ?>
+            <button type="button" class="btn btn-sm btn-outline-secondary bb-quick-service" data-service-id="<?php echo (int)$sv['id']; ?>" data-price="<?php echo htmlspecialchars($price); ?>">
+                <?php echo htmlspecialchars($sv['name']); ?> (₱<?php echo number_format($price, 0); ?>)
+            </button>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <form method="post" id="bbAddSaleForm" class="row g-3">
             <div class="col-md-4">
                 <label class="form-label"><i class="bi bi-person-badge text-muted me-1"></i> Barber</label>
-                <select name="barber_id" class="form-select form-select-sm" required>
+                <select name="barber_id" class="form-select form-select-sm" required autofocus>
                     <option value="">Select barber</option>
                     <?php foreach ($barbers as $barber): ?>
                         <option value="<?php echo $barber['id']; ?>">
@@ -165,9 +243,10 @@ foreach ($breakdownRows as $r) {
                     placeholder="Optional"
                 >
             </div>
-            <div class="col-12 d-flex gap-2 pt-1">
-                <button type="submit" class="btn btn-bb-primary"><i class="bi bi-check-lg"></i> Save sale</button>
+            <div class="col-12 d-flex flex-wrap gap-2 align-items-center pt-1">
+                <button type="submit" id="bbSubmitSaleBtn" class="btn btn-bb-primary"><i class="bi bi-check-lg"></i> Save sale</button>
                 <a href="index.php" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Dashboard</a>
+                <span class="text-muted small ms-1"><kbd>Enter</kbd> = submit</span>
             </div>
         </form>
     </div>
@@ -274,18 +353,68 @@ foreach ($breakdownRows as $r) {
 })();
 </script>
 <script>
+window.bbLastSale = <?php echo $lastSale ? json_encode($lastSale) : 'null'; ?>;
+
+(function () {
+    var form = document.getElementById('bbAddSaleForm');
+    var barberSelect = form && form.querySelector('select[name="barber_id"]');
+    var serviceSelect = form && form.querySelector('select[name="service_id"]');
+    var priceInput = form && form.querySelector('input[name="price"]');
+    var paymentSelect = form && form.querySelector('select[name="payment_method"]');
+
+    if (!form || !barberSelect || !serviceSelect || !priceInput) return;
+
+    // Enter = submit (except when in select, so dropdown can be used)
+    form.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && e.target.tagName === 'SELECT') return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            form.submit();
+        }
+    });
+
+    // Auto-focus barber on load (backup; autofocus attribute also set)
+    if (barberSelect && !form.querySelector(':focus')) {
+        barberSelect.focus();
+    }
+
     // Auto-fill price when service changes
-    const serviceSelect = document.querySelector('select[name="service_id"]');
-    const priceInput = document.querySelector('input[name="price"]');
-    if (serviceSelect && priceInput) {
-        serviceSelect.addEventListener('change', function () {
-            const opt = this.options[this.selectedIndex];
-            const price = opt.getAttribute('data-price');
-            if (price) {
-                priceInput.value = price;
-            }
+    serviceSelect.addEventListener('change', function () {
+        var opt = this.options[this.selectedIndex];
+        var price = opt.getAttribute('data-price');
+        if (price) priceInput.value = price;
+    });
+
+    // Repeat last sale: fill form and submit
+    var repeatBtn = document.getElementById('bbRepeatLastBtn');
+    if (repeatBtn && window.bbLastSale) {
+        repeatBtn.addEventListener('click', function () {
+            var last = window.bbLastSale;
+            barberSelect.value = String(last.barber_id);
+            serviceSelect.value = String(last.service_id);
+            serviceSelect.dispatchEvent(new Event('change'));
+            priceInput.value = String(last.price);
+            if (paymentSelect) paymentSelect.value = last.payment_method;
+            form.submit();
         });
     }
+
+    // Quick service: set service + price + last barber & payment, focus barber
+    document.querySelectorAll('.bb-quick-service').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var serviceId = btn.getAttribute('data-service-id');
+            var price = btn.getAttribute('data-price');
+            serviceSelect.value = serviceId;
+            serviceSelect.dispatchEvent(new Event('change'));
+            priceInput.value = price || '';
+            if (window.bbLastSale) {
+                barberSelect.value = String(window.bbLastSale.barber_id);
+                if (paymentSelect) paymentSelect.value = window.bbLastSale.payment_method;
+            }
+            barberSelect.focus();
+        });
+    });
+})();
 </script>
 
 <?php include 'partials/footer.php'; ?>

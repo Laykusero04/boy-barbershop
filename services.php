@@ -1,5 +1,16 @@
 <?php
 require 'connection.php';
+
+// Load active inventory items (for usage-per-service section)
+$inventoryItems = [];
+$usageCountByService = [];
+try {
+    $inventoryItems = $pdo->query('SELECT id, item_name, unit FROM inventory_items WHERE is_active = 1 ORDER BY item_name')->fetchAll();
+    $usageCountByService = $pdo->query('SELECT service_id, COUNT(*) AS cnt FROM service_inventory_usage GROUP BY service_id')->fetchAll(PDO::FETCH_KEY_PAIR);
+} catch (Throwable $e) {
+    // service_inventory_usage table may not exist yet
+    $usageCountByService = [];
+}
 ?>
 <?php include 'partials/header.php'; ?>
 
@@ -23,9 +34,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'update' && $id) {
             $stmt = $pdo->prepare('UPDATE services SET name = ?, default_price = ? WHERE id = ?');
             $stmt->execute([$name, $price, $id]);
+            $serviceId = $id;
         } else {
             $stmt = $pdo->prepare('INSERT INTO services (name, default_price) VALUES (?, ?)');
             $stmt->execute([$name, $price]);
+            $serviceId = (int)$pdo->lastInsertId();
+        }
+
+        // Replace "usage per service" mapping (only if table exists and we have a valid service id)
+        if ($serviceId && !empty($inventoryItems)) {
+            try {
+                $pdo->prepare('DELETE FROM service_inventory_usage WHERE service_id = ?')->execute([$serviceId]);
+                $usage = $_POST['usage'] ?? [];
+                $insStmt = $pdo->prepare('INSERT INTO service_inventory_usage (service_id, inventory_item_id, quantity_per_service) VALUES (?, ?, ?)');
+                foreach ($inventoryItems as $item) {
+                    $itemId = (int)$item['id'];
+                    $qty = isset($usage[$itemId]) ? (float)$usage[$itemId] : 0;
+                    if ($qty > 0) {
+                        $insStmt->execute([$serviceId, $itemId, $qty]);
+                    }
+                }
+            } catch (Throwable $e) {
+                // ignore if table missing
+            }
         }
     }
 
@@ -41,11 +72,23 @@ if (isset($_GET['deactivate'])) {
 }
 
 $editService = null;
+$usageByItem = []; // inventory_item_id => quantity_per_service (when editing)
 if (isset($_GET['edit'])) {
     $id = (int)$_GET['edit'];
     $stmt = $pdo->prepare('SELECT * FROM services WHERE id = ?');
     $stmt->execute([$id]);
     $editService = $stmt->fetch();
+    if ($editService) {
+        try {
+            $rows = $pdo->prepare('SELECT inventory_item_id, quantity_per_service FROM service_inventory_usage WHERE service_id = ?');
+            $rows->execute([$editService['id']]);
+            while ($row = $rows->fetch()) {
+                $usageByItem[(int)$row['inventory_item_id']] = (float)$row['quantity_per_service'];
+            }
+        } catch (Throwable $e) {
+            // table may not exist
+        }
+    }
 }
 
 $services = $pdo->query('SELECT * FROM services ORDER BY is_active DESC, name')->fetchAll();
@@ -86,6 +129,21 @@ $services = $pdo->query('SELECT * FROM services ORDER BY is_active DESC, name')-
                             value="<?php echo $editService ? htmlspecialchars($editService['default_price']) : '0'; ?>"
                         >
                     </div>
+                    <?php if (!empty($inventoryItems)): ?>
+                    <div>
+                        <label class="form-label small"><i class="bi bi-box-seam text-muted me-1"></i> Inventory used per service</label>
+                        <p class="form-text small mb-2">Quantity of each item consumed per service (e.g. 1 blade, 2g pomade). Leave 0 or empty if not used.</p>
+                        <div class="vstack gap-2">
+                            <?php foreach ($inventoryItems as $item): ?>
+                                <?php $qty = $usageByItem[(int)$item['id']] ?? ''; ?>
+                                <div class="d-flex align-items-center gap-2">
+                                    <label class="small text-muted mb-0 flex-grow-1"><?php echo htmlspecialchars($item['item_name']); ?><?php if (!empty($item['unit'])): ?> <span class="text-muted">(<?php echo htmlspecialchars($item['unit']); ?>)</span><?php endif; ?></label>
+                                    <input type="number" name="usage[<?php echo (int)$item['id']; ?>]" class="form-control form-control-sm" min="0" step="0.001" style="width: 6rem;" value="<?php echo $qty !== '' ? htmlspecialchars((string)$qty) : ''; ?>" placeholder="0">
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-bb-primary">
                             <?php echo $editService ? 'Save changes' : 'Add service'; ?>
@@ -115,8 +173,14 @@ $services = $pdo->query('SELECT * FROM services ORDER BY is_active DESC, name')-
                         </thead>
                         <tbody>
                         <?php foreach ($services as $service): ?>
+                            <?php $usageCount = (int)($usageCountByService[$service['id']] ?? 0); ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($service['name']); ?></td>
+                                <td>
+                                    <?php echo htmlspecialchars($service['name']); ?>
+                                    <?php if ($usageCount > 0): ?>
+                                        <span class="badge bg-secondary-subtle text-secondary ms-1" title="Inventory items used per service">Uses <?php echo $usageCount; ?> item<?php echo $usageCount === 1 ? '' : 's'; ?></span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="text-end">
                                     <?php echo number_format($service['default_price'], 2); ?>
                                 </td>
