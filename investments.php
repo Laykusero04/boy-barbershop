@@ -5,7 +5,7 @@ $message = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $itemName = trim($_POST['item_name'] ?? '');
-    $cost = (float)($_POST['cost'] ?? 0);
+    $cost = (float) str_replace(',', '', $_POST['cost'] ?? '');
     $investmentDate = trim($_POST['investment_date'] ?? '');
 
     if ($itemName !== '' && $cost > 0) {
@@ -66,7 +66,7 @@ try {
                     </div>
                     <div>
                         <label class="form-label small">Cost</label>
-                        <input type="number" name="cost" class="form-control form-control-sm" step="0.01" min="0" required>
+                        <input type="text" name="cost" id="bbInvestmentCost" class="form-control form-control-sm" inputmode="decimal" placeholder="Cost" required autocomplete="off">
                     </div>
                     <div>
                         <label class="form-label small">Date (optional)</label>
@@ -119,6 +119,32 @@ try {
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var costInput = document.getElementById('bbInvestmentCost');
+    if (!costInput) return;
+
+    function formatWithCommas(val) {
+        var s = String(val).replace(/,/g, '');
+        var parts = s.split('.');
+        parts[0] = parts[0].replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return parts.length > 1 ? parts[0] + '.' + parts[1].replace(/\D/g, '').slice(0, 2) : parts[0];
+    }
+
+    costInput.addEventListener('input', function () {
+        this.value = formatWithCommas(this.value);
+    });
+
+    costInput.addEventListener('blur', function () {
+        if (this.value) this.value = formatWithCommas(this.value);
+    });
+
+    costInput.form.addEventListener('submit', function () {
+        costInput.value = costInput.value.replace(/,/g, '');
+    });
+})();
+</script>
 
 <?php include 'partials/footer.php'; ?>
 
