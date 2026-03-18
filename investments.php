@@ -47,7 +47,7 @@ try {
         <h1 class="bb-page-title">Investments</h1>
         <p class="bb-page-subtitle">Record equipment and capital. Used for ROI on the dashboard.</p>
     </div>
-    <div class="fw-semibold">Total: ₱<?php echo number_format($totalInvestment, 2); ?></div>
+    <div class="fw-semibold">Total: ₱<?php echo number_format($totalInvestment, 2, '.', ','); ?></div>
 </div>
 
 <?php if ($message): ?>
@@ -108,7 +108,7 @@ try {
                                         ?>
                                     </td>
                                     <td><?php echo htmlspecialchars($it['item_name']); ?></td>
-                                    <td class="text-end">₱<?php echo number_format($it['cost'], 2); ?></td>
+                                    <td class="text-end">₱<?php echo number_format((float)$it['cost'], 2, '.', ','); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
