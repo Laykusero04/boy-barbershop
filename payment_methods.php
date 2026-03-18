@@ -1,18 +1,7 @@
 <?php
 require 'connection.php';
-?>
-<?php include 'partials/header.php'; ?>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <div>
-        <h1 class="bb-page-title">Payment methods</h1>
-        <p class="bb-page-subtitle">Manage payment options shown in Add Sale. Active methods appear in the dropdown.</p>
-    </div>
-    <a href="payment_methods.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add payment method</a>
-</div>
-
-<?php
-// Handle create / update / deactivate
+// Handle create / update - redirect before any output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
     $name = trim($_POST['name'] ?? '');
@@ -68,6 +57,15 @@ try {
     $paymentMethods = [];
 }
 ?>
+<?php include 'partials/header.php'; ?>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="bb-page-title">Payment methods</h1>
+        <p class="bb-page-subtitle">Manage payment options shown in Add Sale. Active methods appear in the dropdown.</p>
+    </div>
+    <a href="payment_methods.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add payment method</a>
+</div>
 
 <div class="row g-4">
     <div class="col-md-4">
