@@ -44,6 +44,7 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Boy Barbershop</title>
+    <link rel="icon" href="assets/img/logo.png" type="image/png" />
 
     <!-- Bootstrap CSS -->
     <link
@@ -113,6 +114,10 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
                         </a>
                         <a href="reports.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'reports.php' ? 'active' : ''; ?>">
                             <i class="bi bi-file-earmark-text"></i><span>Reports</span>
+                        </a>
+                        <span class="text-muted text-uppercase fw-semibold small mt-2">Owner</span>
+                        <a href="owner_insights.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'owner_insights.php' ? 'active' : ''; ?>">
+                            <i class="bi bi-wallet2"></i><span>Owner pay &amp; insights</span>
                         </a>
                         <span class="text-muted text-uppercase fw-semibold small mt-2">Peak</span>
                         <a href="analytics.php?section=activity" class="nav-link bb-nav-sub <?php echo (basename($_SERVER['PHP_SELF']) === 'analytics.php' && ($_GET['section'] ?? '') === 'activity') ? 'active' : ''; ?>">
