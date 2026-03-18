@@ -394,6 +394,11 @@ $stmt = $pdo->prepare('
 ');
 $stmt->execute([$todayStart, $todayEnd]);
 $salesToday = $stmt->fetchAll();
+$lastSale = !empty($salesToday) ? $salesToday[0] : null;
+
+// Daily target display (for Today block)
+$dailyTargetRemaining = ($dailyTarget > 0) ? max(0, $dailyTarget - $todaySales) : 0;
+$dailyTargetProgress = ($dailyTarget > 0) ? min(100, round((($todaySales ?: 0) / $dailyTarget) * 100, 0)) : 0;
 
 // Barber earnings for today
 $stmt = $pdo->prepare('
@@ -423,6 +428,13 @@ $earnings = $stmt->fetchAll();
     <a href="reports.php" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-text"></i> Reports</a>
 </div>
 
+<?php
+$alertsDisplay = $smartAlerts;
+$alertsOverflow = count($smartAlerts) > 3 ? count($smartAlerts) - 3 : 0;
+if ($alertsOverflow > 0) {
+    $alertsDisplay = array_slice($smartAlerts, 0, 3);
+}
+?>
 <?php if (!empty($smartAlerts)): ?>
 <div class="mb-4">
     <div class="card border-0 shadow-sm">
@@ -431,8 +443,8 @@ $earnings = $stmt->fetchAll();
                 <span class="text-muted small"><i class="bi bi-bell me-1"></i> Alerts</span>
             </div>
             <ul class="list-unstyled mb-0 small">
-                <?php foreach ($smartAlerts as $i => $alert): ?>
-                <li class="d-flex align-items-center gap-2 py-1 <?php echo $i < count($smartAlerts) - 1 ? 'border-bottom border-secondary border-opacity-25' : ''; ?>">
+                <?php foreach ($alertsDisplay as $i => $alert): ?>
+                <li class="d-flex align-items-center gap-2 py-1 <?php echo $i < count($alertsDisplay) - 1 ? 'border-bottom border-secondary border-opacity-25' : ''; ?>">
                     <i class="bi <?php echo htmlspecialchars($alert['icon']); ?> text-warning"></i>
                     <span class="flex-grow-1"><?php echo htmlspecialchars($alert['message']); ?></span>
                     <?php if (!empty($alert['link'])): ?>
@@ -440,6 +452,11 @@ $earnings = $stmt->fetchAll();
                     <?php endif; ?>
                 </li>
                 <?php endforeach; ?>
+                <?php if ($alertsOverflow > 0): ?>
+                <li class="py-1 text-muted">
+                    <span class="small">and <?php echo $alertsOverflow; ?> more — check <a href="expenses.php">Expenses</a>, <a href="analytics.php?section=peak">Peak</a>, <a href="inventory.php">Inventory</a></span>
+                </li>
+                <?php endif; ?>
             </ul>
         </div>
     </div>
@@ -453,6 +470,25 @@ $earnings = $stmt->fetchAll();
             <h5 class="bb-section-title mb-0"><i class="bi bi-calendar-day"></i> Today</h5>
             <span class="bb-section-subtitle"><?php echo htmlspecialchars(date('F j, Y')); ?></span>
         </div>
+        <?php if ($lastSale): ?>
+        <p class="small text-muted mb-3 mb-md-2">
+            <i class="bi bi-clock-history me-1"></i> Last sale: <strong><?php echo date('g:i A', strtotime($lastSale['sale_datetime'])); ?></strong> — <?php echo htmlspecialchars($lastSale['service_name']); ?>, ₱<?php echo number_format($lastSale['price'], 2); ?> (<?php echo htmlspecialchars($lastSale['barber_name']); ?>)
+        </p>
+        <?php elseif ((int)($today['total_transactions'] ?? 0) === 0): ?>
+        <p class="small text-muted mb-3 mb-md-2"><i class="bi bi-info-circle me-1"></i> No sales recorded yet today.</p>
+        <?php endif; ?>
+        <?php if ($dailyTarget > 0): ?>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <span class="small"><i class="bi bi-bullseye me-1"></i> Daily target: <strong>₱<?php echo number_format($dailyTarget, 0); ?></strong></span>
+            <span class="small text-muted">Remaining: <strong>₱<?php echo number_format($dailyTargetRemaining, 0); ?></strong></span>
+            <div class="flex-grow-1" style="max-width: 120px;">
+                <div class="progress" style="height: 6px;" role="progressbar" aria-valuenow="<?php echo (int)$dailyTargetProgress; ?>" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar bg-primary" style="width: <?php echo (int)$dailyTargetProgress; ?>%"></div>
+                </div>
+            </div>
+            <a href="analytics.php?section=peak" class="btn btn-sm btn-outline-secondary">Set target</a>
+        </div>
+        <?php endif; ?>
         <div class="bb-stat-grid">
             <div class="bb-stat-card">
                 <div class="bb-stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-people"></i></div>
@@ -483,7 +519,129 @@ $earnings = $stmt->fetchAll();
                 <div class="bb-stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-trophy"></i></div>
                 <div class="bb-stat-label">Top barber</div>
                 <div class="bb-stat-value"><?php echo htmlspecialchars($topToday['name'] ?? '—'); ?></div>
-                <div class="bb-stat-value"><small>₱<?php echo number_format($topToday['total_sales'] ?? 0, 2); ?></small></div>
+                <div class="bb-stat-value">₱<?php echo number_format($topToday['total_sales'] ?? 0, 2); ?></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick actions -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <a href="add_sale.php" class="text-decoration-none text-body">
+            <div class="bb-action-card">
+                <div class="bb-action-icon"><i class="bi bi-plus-circle"></i></div>
+                <div class="bb-action-title">Add sale</div>
+                <div class="bb-action-desc">Record a new haircut or service with barber, service, and payment.</div>
+                <span class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add sale</span>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-3">
+        <a href="expenses.php" class="text-decoration-none text-body">
+            <div class="bb-action-card">
+                <div class="bb-action-icon"><i class="bi bi-receipt"></i></div>
+                <div class="bb-action-title">Expenses</div>
+                <div class="bb-action-desc">Track rent, supplies, and other costs by date and category.</div>
+                <span class="btn btn-sm btn-outline-secondary">Go to Expenses</span>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-3">
+        <a href="reports.php" class="text-decoration-none text-body">
+            <div class="bb-action-card">
+                <div class="bb-action-icon"><i class="bi bi-file-earmark-text"></i></div>
+                <div class="bb-action-title">Reports</div>
+                <div class="bb-action-desc">Daily, weekly, and monthly reports plus barber payroll.</div>
+                <span class="btn btn-sm btn-outline-secondary">Open reports</span>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-3">
+        <a href="analytics.php?section=peak" class="text-decoration-none text-body">
+            <div class="bb-action-card">
+                <div class="bb-action-icon"><i class="bi bi-bullseye"></i></div>
+                <div class="bb-action-title">Peak & daily target</div>
+                <div class="bb-action-desc">Set daily sales target and see busy hours.</div>
+                <span class="btn btn-sm btn-outline-secondary">Peak & target</span>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Today's sales + Barber earnings (moved up) -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="bb-section-card card h-100">
+            <div class="card-body">
+                <h5 class="bb-section-title mb-3"><i class="bi bi-list-check"></i> Today's sales</h5>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Barber</th>
+                            <th>Service</th>
+                            <th class="text-end">Price</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php if (!$salesToday): ?>
+                            <tr>
+                                <td colspan="4" class="p-0">
+                                    <div class="bb-empty">
+                                        <i class="bi bi-cart-x"></i>
+                                        <p>No sales recorded yet today.</p>
+                                        <a href="add_sale.php" class="btn btn-sm btn-bb-primary mt-2"><i class="bi bi-plus-lg"></i> Add sale</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($salesToday as $sale): ?>
+                                <tr>
+                                    <td><?php echo date('H:i', strtotime($sale['sale_datetime'])); ?></td>
+                                    <td><?php echo htmlspecialchars($sale['barber_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($sale['service_name']); ?></td>
+                                    <td class="text-end fw-semibold">₱<?php echo number_format($sale['price'], 2); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="bb-section-card card h-100">
+            <div class="card-body">
+                <h5 class="bb-section-title mb-3"><i class="bi bi-person-badge"></i> Barber earnings (today)</h5>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>Barber</th>
+                            <th class="text-end">Sales</th>
+                            <th class="text-end">Share %</th>
+                            <th class="text-end">Earnings</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($earnings as $row): ?>
+                            <?php
+                            $totalSales = $row['total_sales'] ?: 0;
+                            $earningsAmount = $totalSales * ($row['percentage_share'] / 100);
+                            ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($row['name']); ?></td>
+                                <td class="text-end">₱<?php echo number_format($totalSales, 2); ?></td>
+                                <td class="text-end"><?php echo number_format($row['percentage_share'], 2); ?>%</td>
+                                <td class="text-end fw-semibold">₱<?php echo number_format($earningsAmount, 2); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -497,6 +655,11 @@ $earnings = $stmt->fetchAll();
             <span class="bb-section-subtitle"><?php echo htmlspecialchars(date('F Y')); ?></span>
         </div>
         <div class="bb-stat-grid">
+            <div class="bb-stat-card">
+                <div class="bb-stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-people"></i></div>
+                <div class="bb-stat-label">Customers</div>
+                <div class="bb-stat-value"><?php echo (int)$monthCustomers; ?></div>
+            </div>
             <div class="bb-stat-card">
                 <div class="bb-stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-currency-exchange"></i></div>
                 <div class="bb-stat-label">Total sales</div>
@@ -516,43 +679,9 @@ $earnings = $stmt->fetchAll();
                 <div class="bb-stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-trophy"></i></div>
                 <div class="bb-stat-label">Top barber</div>
                 <div class="bb-stat-value"><?php echo htmlspecialchars($topMonth['name'] ?? '—'); ?></div>
-                <div class="bb-stat-value"><small>₱<?php echo number_format($topMonth['total_sales'] ?? 0, 2); ?></small></div>
+                <div class="bb-stat-value">₱<?php echo number_format($topMonth['total_sales'] ?? 0, 2); ?></div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Quick actions -->
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <a href="add_sale.php" class="text-decoration-none text-body">
-            <div class="bb-action-card">
-                <div class="bb-action-icon"><i class="bi bi-plus-circle"></i></div>
-                <div class="bb-action-title">Add sale</div>
-                <div class="bb-action-desc">Record a new haircut or service with barber, service, and payment.</div>
-                <span class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add sale</span>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="expenses.php" class="text-decoration-none text-body">
-            <div class="bb-action-card">
-                <div class="bb-action-icon"><i class="bi bi-receipt"></i></div>
-                <div class="bb-action-title">Expenses</div>
-                <div class="bb-action-desc">Track rent, supplies, and other costs by date and category.</div>
-                <span class="btn btn-sm btn-outline-secondary">Go to Expenses</span>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-4">
-        <a href="reports.php" class="text-decoration-none text-body">
-            <div class="bb-action-card">
-                <div class="bb-action-icon"><i class="bi bi-file-earmark-text"></i></div>
-                <div class="bb-action-title">Reports</div>
-                <div class="bb-action-desc">Daily, weekly, and monthly reports plus barber payroll.</div>
-                <span class="btn btn-sm btn-outline-secondary">Open reports</span>
-            </div>
-        </a>
     </div>
 </div>
 
@@ -563,6 +692,9 @@ $earnings = $stmt->fetchAll();
             <h5 class="bb-section-title mb-0"><i class="bi bi-piggy-bank"></i> ROI (all-time)</h5>
             <a href="investments.php" class="btn btn-sm btn-outline-secondary"><i class="bi bi-plus-lg"></i> Investments</a>
         </div>
+        <?php if (($totalInvestment ?: 0) <= 0): ?>
+        <p class="text-muted small mb-0">No investments recorded. <a href="investments.php">Add investments</a> to track ROI and payback progress.</p>
+        <?php else: ?>
         <div class="bb-stat-grid">
             <div class="bb-stat-card">
                 <div class="bb-stat-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-wallet2"></i></div>
@@ -588,10 +720,8 @@ $earnings = $stmt->fetchAll();
             <div class="progress" role="progressbar" aria-valuenow="<?php echo (int)$roiProgress; ?>" aria-valuemin="0" aria-valuemax="100">
                 <div class="progress-bar bg-primary" style="width: <?php echo (float)$roiProgress; ?>%"></div>
             </div>
-            <?php if (($totalInvestment ?: 0) <= 0): ?>
-                <p class="form-text small mb-0 mt-1">Add investment items in <a href="investments.php">Investments</a> to enable ROI.</p>
-            <?php endif; ?>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -601,8 +731,9 @@ $earnings = $stmt->fetchAll();
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
             <h5 class="bb-section-title mb-0"><i class="bi bi-lightbulb"></i> Insights & suggestions</h5>
             <?php if ($insightMonthCount > 0): ?>
+            <span class="small text-muted">Based on <strong><?php echo (int)$ownerPayPercent; ?>%</strong> owner pay</span>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#insight-customize" aria-expanded="false">
-                <i class="bi bi-gear"></i> Customize
+                <i class="bi bi-gear"></i> Edit
             </button>
             <?php endif; ?>
         </div>
@@ -699,82 +830,4 @@ $earnings = $stmt->fetchAll();
     </div>
 </div>
 
-<div class="row g-3">
-    <div class="col-lg-6">
-        <div class="bb-section-card card h-100">
-            <div class="card-body">
-                <h5 class="bb-section-title mb-3"><i class="bi bi-list-check"></i> Today’s sales</h5>
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Barber</th>
-                            <th>Service</th>
-                            <th class="text-end">Price</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <?php if (!$salesToday): ?>
-                            <tr>
-                                <td colspan="4" class="p-0">
-                                    <div class="bb-empty">
-                                        <i class="bi bi-cart-x"></i>
-                                        <p>No sales recorded yet today.</p>
-                                        <a href="add_sale.php" class="btn btn-sm btn-bb-primary mt-2"><i class="bi bi-plus-lg"></i> Add sale</a>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php else: ?>
-                            <?php foreach ($salesToday as $sale): ?>
-                                <tr>
-                                    <td><?php echo date('H:i', strtotime($sale['sale_datetime'])); ?></td>
-                                    <td><?php echo htmlspecialchars($sale['barber_name']); ?></td>
-                                    <td><?php echo htmlspecialchars($sale['service_name']); ?></td>
-                                    <td class="text-end fw-semibold">₱<?php echo number_format($sale['price'], 2); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="bb-section-card card h-100">
-            <div class="card-body">
-                <h5 class="bb-section-title mb-3"><i class="bi bi-person-badge"></i> Barber earnings (today)</h5>
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                        <tr>
-                            <th>Barber</th>
-                            <th class="text-end">Sales</th>
-                            <th class="text-end">Share %</th>
-                            <th class="text-end">Earnings</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($earnings as $row): ?>
-                            <?php
-                            $totalSales = $row['total_sales'] ?: 0;
-                            $earningsAmount = $totalSales * ($row['percentage_share'] / 100);
-                            ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($row['name']); ?></td>
-                                <td class="text-end">₱<?php echo number_format($totalSales, 2); ?></td>
-                                <td class="text-end"><?php echo number_format($row['percentage_share'], 2); ?>%</td>
-                                <td class="text-end fw-semibold">₱<?php echo number_format($earningsAmount, 2); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <?php include 'partials/footer.php'; ?>
-

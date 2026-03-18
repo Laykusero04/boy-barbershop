@@ -92,7 +92,7 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
                     <nav class="nav flex-column bb-sidebar">
                         <span class="text-muted text-uppercase fw-semibold small">Menu</span>
                         <a href="index.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'index.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-calendar-day"></i><span>Today</span>
+                            <i class="bi bi-house-door"></i><span>Dashboard</span>
                         </a>
                         <a href="add_sale.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'add_sale.php' ? 'active' : ''; ?>">
                             <i class="bi bi-plus-circle"></i><span>Add sale</span>

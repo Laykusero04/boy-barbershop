@@ -1,7 +1,7 @@
                 </div>
                 <div class="card-footer bg-transparent border-0 pt-0">
                     <div class="bb-footer text-muted text-end">
-                        Boy Barbershop &middot; Cashier System MVP
+                        Boy Barbershop
                     </div>
                 </div>
             </div>

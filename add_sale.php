@@ -253,7 +253,7 @@ if ($lastSaleRow) {
 </div>
 
 <!-- Daily services breakdown drawer -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="bbBreakdownDrawer" aria-labelledby="bbBreakdownDrawerLabel" style="width: 100%; max-width: 420px;">
+<div class="offcanvas offcanvas-end" tabindex="-1" id="bbBreakdownDrawer" aria-labelledby="bbBreakdownDrawerLabel" style="width: 100%; max-width: 700px;">
     <div class="offcanvas-header border-bottom">
         <h5 class="offcanvas-title" id="bbBreakdownDrawerLabel">
             <i class="bi bi-calendar-day"></i> Daily breakdown
