@@ -276,6 +276,35 @@ body {
   color: var(--bb-muted);
 }
 
+/* Today stat strip: horizontal scroll on small screens */
+.bb-stat-strip {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-left: -0.25rem;
+  margin-right: -0.25rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+@media (max-width: 767.98px) {
+  .bb-stat-strip .bb-stat-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    grid-template-columns: unset;
+    gap: 1rem;
+  }
+  .bb-stat-strip .bb-stat-card {
+    min-width: 130px;
+    flex-shrink: 0;
+  }
+  .bb-stat-strip .bb-stat-card .bb-stat-value {
+    font-size: 1.1rem;
+  }
+  .bb-stat-strip .bb-stat-card .bb-stat-value small {
+    font-size: 0.75rem;
+  }
+}
+
 /* Section cards with header */
 .bb-section-card {
   border: 1px solid var(--bb-border);

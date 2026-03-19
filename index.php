@@ -454,10 +454,34 @@ if ($alertsOverflow > 0) {
                 <?php endforeach; ?>
                 <?php if ($alertsOverflow > 0): ?>
                 <li class="py-1 text-muted">
-                    <span class="small">and <?php echo $alertsOverflow; ?> more — check <a href="expenses.php">Expenses</a>, <a href="analytics.php?section=peak">Peak</a>, <a href="inventory.php">Inventory</a></span>
+                    <a href="#" class="small" data-bs-toggle="modal" data-bs-target="#bbAlertsModal">View all <?php echo count($smartAlerts); ?> alerts</a>
                 </li>
                 <?php endif; ?>
             </ul>
+        </div>
+    </div>
+</div>
+<!-- Alerts modal (full list) -->
+<div class="modal fade" id="bbAlertsModal" tabindex="-1" aria-labelledby="bbAlertsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="bbAlertsModalLabel"><i class="bi bi-bell me-1"></i> All alerts</h6>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-2">
+                <ul class="list-unstyled mb-0 small">
+                    <?php foreach ($smartAlerts as $i => $alert): ?>
+                    <li class="d-flex align-items-center gap-2 py-2 <?php echo $i < count($smartAlerts) - 1 ? 'border-bottom border-secondary border-opacity-25' : ''; ?>">
+                        <i class="bi <?php echo htmlspecialchars($alert['icon']); ?> text-warning"></i>
+                        <span class="flex-grow-1"><?php echo htmlspecialchars($alert['message']); ?></span>
+                        <?php if (!empty($alert['link'])): ?>
+                        <a href="<?php echo htmlspecialchars($alert['link']); ?>" class="btn btn-sm btn-outline-secondary">View</a>
+                        <?php endif; ?>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
         </div>
     </div>
 </div>
@@ -489,6 +513,7 @@ if ($alertsOverflow > 0) {
             <a href="analytics.php?section=peak" class="btn btn-sm btn-outline-secondary">Set target</a>
         </div>
         <?php endif; ?>
+        <div class="bb-stat-strip">
         <div class="bb-stat-grid">
             <div class="bb-stat-card">
                 <div class="bb-stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-people"></i></div>
@@ -518,9 +543,9 @@ if ($alertsOverflow > 0) {
             <div class="bb-stat-card">
                 <div class="bb-stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-trophy"></i></div>
                 <div class="bb-stat-label">Top barber</div>
-                <div class="bb-stat-value"><?php echo htmlspecialchars($topToday['name'] ?? '—'); ?></div>
-                <div class="bb-stat-value">₱<?php echo number_format($topToday['total_sales'] ?? 0, 2); ?></div>
+                <div class="bb-stat-value"><?php echo htmlspecialchars($topToday['name'] ?? '—'); ?><small class="d-block mt-0">₱<?php echo number_format($topToday['total_sales'] ?? 0, 2); ?></small></div>
             </div>
+        </div>
         </div>
     </div>
 </div>
@@ -605,8 +630,8 @@ if ($alertsOverflow > 0) {
                                     <td><?php echo htmlspecialchars($sale['service_name']); ?></td>
                                     <td class="text-end fw-semibold">₱<?php echo number_format($sale['price'], 2); ?></td>
                                     <td class="text-end">
-                                        <a href="add_sale.php?day=<?php echo urlencode(date('Y-m-d')); ?>&edit=<?php echo (int)$sale['id']; ?>" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
-                                        <button type="button" class="btn btn-sm btn-outline-danger ms-1" title="Delete" data-bs-toggle="modal" data-bs-target="#bbDeleteSaleModal" data-sale-id="<?php echo (int)$sale['id']; ?>" data-sale-desc="<?php echo htmlspecialchars(date('H:i', strtotime($sale['sale_datetime'])) . ' ' . $sale['barber_name'] . ' – ' . $sale['service_name'] . ' ₱' . number_format($sale['price'], 2)); ?>"><i class="bi bi-trash"></i></button>
+                                        <a href="add_sale.php?day=<?php echo urlencode(date('Y-m-d')); ?>&edit=<?php echo (int)$sale['id']; ?>" class="btn btn-sm btn-outline-secondary" title="Edit" aria-label="Edit sale"><i class="bi bi-pencil"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ms-1" title="Delete" aria-label="Delete sale" data-bs-toggle="modal" data-bs-target="#bbDeleteSaleModal" data-sale-id="<?php echo (int)$sale['id']; ?>" data-sale-desc="<?php echo htmlspecialchars(date('H:i', strtotime($sale['sale_datetime'])) . ' ' . $sale['barber_name'] . ' – ' . $sale['service_name'] . ' ₱' . number_format($sale['price'], 2)); ?>"><i class="bi bi-trash"></i></button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -683,8 +708,7 @@ if ($alertsOverflow > 0) {
             <div class="bb-stat-card">
                 <div class="bb-stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-trophy"></i></div>
                 <div class="bb-stat-label">Top barber</div>
-                <div class="bb-stat-value"><?php echo htmlspecialchars($topMonth['name'] ?? '—'); ?></div>
-                <div class="bb-stat-value">₱<?php echo number_format($topMonth['total_sales'] ?? 0, 2); ?></div>
+                <div class="bb-stat-value"><?php echo htmlspecialchars($topMonth['name'] ?? '—'); ?><small class="d-block mt-0">₱<?php echo number_format($topMonth['total_sales'] ?? 0, 2); ?></small></div>
             </div>
         </div>
     </div>
@@ -882,4 +906,4 @@ if ($alertsOverflow > 0) {
 })();
 </script>
 
-<?php include 'partials/footer.php'; ?>
+<?php $showBackToTop = true; include 'partials/footer.php'; ?>

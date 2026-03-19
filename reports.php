@@ -123,13 +123,16 @@ try {
     <div class="card-body">
         <form class="row g-2 align-items-end" method="get">
             <div class="col-sm-4 col-md-3">
-                <label class="form-label small">Preset</label>
+                <label class="form-label small">Report period</label>
                 <select name="preset" class="form-select form-select-sm">
-                    <option value="daily" <?php echo $preset === 'daily' ? 'selected' : ''; ?>>Daily</option>
-                    <option value="weekly" <?php echo $preset === 'weekly' ? 'selected' : ''; ?>>Weekly</option>
-                    <option value="monthly" <?php echo $preset === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
-                    <option value="custom" <?php echo $preset === 'custom' ? 'selected' : ''; ?>>Custom</option>
+                    <option value="daily" <?php echo $preset === 'daily' ? 'selected' : ''; ?>>Daily (Today)</option>
+                    <option value="weekly" <?php echo $preset === 'weekly' ? 'selected' : ''; ?>>Weekly (This week)</option>
+                    <option value="monthly" <?php echo $preset === 'monthly' ? 'selected' : ''; ?>>Monthly (This month)</option>
+                    <option value="custom" <?php echo $preset === 'custom' ? 'selected' : ''; ?>>Custom (Choose dates)</option>
                 </select>
+                <div class="form-text small">
+                    Generates based on the range implied by the selected period.
+                </div>
             </div>
             <div class="col-sm-4 col-md-3">
                 <label class="form-label small">From</label>
@@ -295,5 +298,5 @@ try {
     }
 </style>
 
-<?php include 'partials/footer.php'; ?>
+<?php $showBackToTop = true; include 'partials/footer.php'; ?>
 

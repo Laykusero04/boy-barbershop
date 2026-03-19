@@ -30,6 +30,12 @@ $messageType = 'info'; // info, success, error (displayed as danger)
 $day = $_GET['day'] ?? date('Y-m-d');
 $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) ? $day : date('Y-m-d');
 $highlightSaleId = isset($_GET['highlight']) && preg_match('/^\d+$/', (string)$_GET['highlight']) ? (int)$_GET['highlight'] : null;
+$salesPage = max(1, (int)($_GET['sales_page'] ?? 1));
+$salesPerPageOptions = [20, 50];
+$salesPerPage = (int)($_GET['sales_per_page'] ?? 20);
+if (!in_array($salesPerPage, $salesPerPageOptions, true)) {
+    $salesPerPage = 20;
+}
 
 // Helper: restore inventory for a service (reverse of deduct)
 $restoreInventoryForService = function ($serviceId) use ($pdo) {
@@ -296,7 +302,19 @@ if ($lastSaleRow) {
     ];
 }
 
-// Individual sales for the selected day (for edit/delete list)
+// Individual sales for the selected day (for edit/delete list, paginated)
+$salesCountStmt = $pdo->prepare('
+    SELECT COUNT(*) AS total_rows
+    FROM sales s
+    WHERE s.sale_datetime BETWEEN ? AND ?
+');
+$salesCountStmt->execute([$dayStart, $dayEnd]);
+$salesTotalRows = (int)($salesCountStmt->fetch()['total_rows'] ?? 0);
+$salesTotalPages = max(1, (int)ceil($salesTotalRows / $salesPerPage));
+if ($salesPage > $salesTotalPages) {
+    $salesPage = $salesTotalPages;
+}
+$salesOffset = ($salesPage - 1) * $salesPerPage;
 $salesForDayStmt = $pdo->prepare('
     SELECT s.id, s.sale_datetime, s.barber_id, b.name AS barber_name, s.service_id, sv.name AS service_name, s.price, s.payment_method, s.notes
     FROM sales s
@@ -304,8 +322,13 @@ $salesForDayStmt = $pdo->prepare('
     JOIN services sv ON s.service_id = sv.id
     WHERE s.sale_datetime BETWEEN ? AND ?
     ORDER BY s.sale_datetime DESC
+    LIMIT ? OFFSET ?
 ');
-$salesForDayStmt->execute([$dayStart, $dayEnd]);
+$salesForDayStmt->bindValue(1, $dayStart);
+$salesForDayStmt->bindValue(2, $dayEnd);
+$salesForDayStmt->bindValue(3, $salesPerPage, PDO::PARAM_INT);
+$salesForDayStmt->bindValue(4, $salesOffset, PDO::PARAM_INT);
+$salesForDayStmt->execute();
 $salesForDay = $salesForDayStmt->fetchAll();
 
 // Edit mode: load sale to pre-fill form
@@ -476,12 +499,21 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
 <div class="bb-section-card card mt-4">
     <div class="card-body">
         <h5 class="bb-section-title mb-3"><i class="bi bi-list-check"></i> Sales for <?php echo htmlspecialchars($day); ?></h5>
-        <form method="get" class="d-flex align-items-end gap-2 mb-3">
-            <div class="flex-grow-1">
+        <form method="get" class="row g-2 align-items-end mb-3">
+            <div class="col-sm-7">
                 <label class="form-label small mb-1">Date</label>
                 <input type="date" name="day" value="<?php echo htmlspecialchars($day); ?>" class="form-control form-control-sm">
             </div>
-            <button class="btn btn-sm btn-bb-primary" type="submit"><i class="bi bi-eye"></i> View</button>
+            <div class="col-sm-3">
+                <label class="form-label small mb-1">Rows</label>
+                <select name="sales_per_page" class="form-select form-select-sm">
+                    <option value="20"<?php echo $salesPerPage === 20 ? ' selected' : ''; ?>>20</option>
+                    <option value="50"<?php echo $salesPerPage === 50 ? ' selected' : ''; ?>>50</option>
+                </select>
+            </div>
+            <div class="col-sm-2">
+                <button class="btn btn-sm btn-bb-primary w-100" type="submit"><i class="bi bi-eye"></i> View</button>
+            </div>
         </form>
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
@@ -510,8 +542,8 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                             <td><?php echo htmlspecialchars($s['service_name']); ?></td>
                             <td class="text-end fw-semibold">₱<?php echo number_format((float)$s['price'], 2); ?></td>
                             <td class="text-end">
-                                <a href="add_sale.php?day=<?php echo urlencode($day); ?>&edit=<?php echo (int)$s['id']; ?>" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger ms-1" title="Delete" data-bs-toggle="modal" data-bs-target="#bbDeleteSaleModal" data-sale-id="<?php echo (int)$s['id']; ?>" data-sale-desc="<?php echo htmlspecialchars(date('H:i', strtotime($s['sale_datetime'])) . ' ' . $s['barber_name'] . ' – ' . $s['service_name'] . ' ₱' . number_format((float)$s['price'], 2)); ?>"><i class="bi bi-trash"></i></button>
+                                <a href="add_sale.php?<?php echo htmlspecialchars(http_build_query(['day' => $day, 'sales_page' => $salesPage, 'sales_per_page' => $salesPerPage, 'edit' => (int)$s['id']])); ?>" class="btn btn-sm btn-outline-secondary" title="Edit" aria-label="Edit sale"><i class="bi bi-pencil"></i></a>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-1" title="Delete" aria-label="Delete sale" data-bs-toggle="modal" data-bs-target="#bbDeleteSaleModal" data-sale-id="<?php echo (int)$s['id']; ?>" data-sale-desc="<?php echo htmlspecialchars(date('H:i', strtotime($s['sale_datetime'])) . ' ' . $s['barber_name'] . ' – ' . $s['service_name'] . ' ₱' . number_format((float)$s['price'], 2)); ?>"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -519,6 +551,22 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                 </tbody>
             </table>
         </div>
+        <?php if ($salesTotalRows > $salesPerPage): ?>
+            <?php
+            $salesPrevParams = ['day' => $day, 'sales_per_page' => $salesPerPage, 'sales_page' => max(1, $salesPage - 1)];
+            $salesNextParams = ['day' => $day, 'sales_per_page' => $salesPerPage, 'sales_page' => min($salesTotalPages, $salesPage + 1)];
+            ?>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                <span class="text-muted small">
+                    Showing <?php echo $salesTotalRows > 0 ? ($salesOffset + 1) : 0; ?>-<?php echo min($salesOffset + count($salesForDay), $salesTotalRows); ?> of <?php echo $salesTotalRows; ?>
+                </span>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Sales pagination">
+                    <a class="btn btn-outline-secondary<?php echo $salesPage <= 1 ? ' disabled' : ''; ?>" href="add_sale.php?<?php echo htmlspecialchars(http_build_query($salesPrevParams)); ?>">Prev</a>
+                    <span class="btn btn-outline-secondary disabled">Page <?php echo $salesPage; ?> / <?php echo $salesTotalPages; ?></span>
+                    <a class="btn btn-outline-secondary<?php echo $salesPage >= $salesTotalPages ? ' disabled' : ''; ?>" href="add_sale.php?<?php echo htmlspecialchars(http_build_query($salesNextParams)); ?>">Next</a>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

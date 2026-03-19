@@ -101,7 +101,6 @@ function bb_breadcrumbs(): array {
             <img src="assets/img/logo.png" alt="Boy Barbershop logo" />
             <div class="bb-brand">
                 BOY BARBERSHOP
-                <span class="text-muted d-none d-sm-inline">Tamnag, Lutayan, Sultan Kudarat</span>
             </div>
         </div>
 

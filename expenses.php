@@ -4,6 +4,28 @@ require 'connection.php';
 // Defaults for filters
 $from = $_GET['from'] ?? date('Y-m-01');
 $to = $_GET['to'] ?? date('Y-m-d');
+$page = max(1, (int)($_GET['page'] ?? 1));
+$perPageOptions = [20, 50];
+$perPage = (int)($_GET['per_page'] ?? 20);
+if (!in_array($perPage, $perPageOptions, true)) {
+    $perPage = 20;
+}
+$sort = (string)($_GET['sort'] ?? 'date_desc');
+$sortMap = [
+    'date_desc' => 'expense_date DESC, id DESC',
+    'date_asc' => 'expense_date ASC, id ASC',
+    'amount_desc' => 'amount DESC, id DESC',
+    'amount_asc' => 'amount ASC, id ASC',
+];
+if (!isset($sortMap[$sort])) {
+    $sort = 'date_desc';
+}
+
+$today = date('Y-m-d');
+$thisMonthFrom = date('Y-m-01');
+$thisMonthTo = $today; // "This month" means month-to-date (matches the page defaults)
+$lastMonthFrom = date('Y-m-01', strtotime('first day of last month'));
+$lastMonthTo = date('Y-m-t', strtotime('last day of last month'));
 
 $message = null;
 $messageType = 'info';
@@ -48,14 +70,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// List expenses by date range
+// List expenses by date range (paginated)
+$countStmt = $pdo->prepare('
+    SELECT COUNT(*) AS total_rows
+    FROM expenses
+    WHERE expense_date BETWEEN ? AND ?
+');
+$countStmt->execute([$from, $to]);
+$totalRows = (int)($countStmt->fetch()['total_rows'] ?? 0);
+$totalPages = max(1, (int)ceil($totalRows / $perPage));
+if ($page > $totalPages) {
+    $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
+$orderSql = $sortMap[$sort];
 $stmt = $pdo->prepare('
     SELECT *
     FROM expenses
     WHERE expense_date BETWEEN ? AND ?
-    ORDER BY expense_date DESC, id DESC
+    ORDER BY ' . $orderSql . '
+    LIMIT ? OFFSET ?
 ');
-$stmt->execute([$from, $to]);
+$stmt->bindValue(1, $from);
+$stmt->bindValue(2, $to);
+$stmt->bindValue(3, $perPage, PDO::PARAM_INT);
+$stmt->bindValue(4, $offset, PDO::PARAM_INT);
+$stmt->execute();
 $expenses = $stmt->fetchAll();
 
 $stmt = $pdo->prepare('SELECT SUM(amount) AS total FROM expenses WHERE expense_date BETWEEN ? AND ?');
@@ -325,16 +365,44 @@ if (!empty($monthlyTotals)) {
                     <span class="fw-semibold">Total: ₱<?php echo number_format($totals['total'] ?: 0, 2); ?></span>
                 </div>
 
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2 d-print-none">
+                    <span class="text-muted small me-1">Presets:</span>
+                    <a class="btn btn-sm btn-outline-secondary<?php echo ($from === $thisMonthFrom && $to === $thisMonthTo) ? ' active' : ''; ?>"
+                       href="expenses.php?<?php echo htmlspecialchars(http_build_query(['from' => $thisMonthFrom, 'to' => $thisMonthTo, 'sort' => $sort, 'per_page' => $perPage, 'page' => 1])); ?>">
+                        This month
+                    </a>
+                    <a class="btn btn-sm btn-outline-secondary<?php echo ($from === $lastMonthFrom && $to === $lastMonthTo) ? ' active' : ''; ?>"
+                       href="expenses.php?<?php echo htmlspecialchars(http_build_query(['from' => $lastMonthFrom, 'to' => $lastMonthTo, 'sort' => $sort, 'per_page' => $perPage, 'page' => 1])); ?>">
+                        Last month
+                    </a>
+                </div>
+
                 <form method="get" class="row g-2 align-items-end mb-3">
-                    <div class="col-sm-4">
+                    <div class="col-sm-3">
                         <label class="form-label small">From</label>
                         <input type="date" name="from" class="form-control form-control-sm" value="<?php echo htmlspecialchars($from); ?>">
                     </div>
-                    <div class="col-sm-4">
+                    <div class="col-sm-3">
                         <label class="form-label small">To</label>
                         <input type="date" name="to" class="form-control form-control-sm" value="<?php echo htmlspecialchars($to); ?>">
                     </div>
-                    <div class="col-sm-4 d-flex gap-2">
+                    <div class="col-sm-3">
+                        <label class="form-label small">Sort</label>
+                        <select name="sort" class="form-select form-select-sm">
+                            <option value="date_desc"<?php echo $sort === 'date_desc' ? ' selected' : ''; ?>>Date (newest)</option>
+                            <option value="date_asc"<?php echo $sort === 'date_asc' ? ' selected' : ''; ?>>Date (oldest)</option>
+                            <option value="amount_desc"<?php echo $sort === 'amount_desc' ? ' selected' : ''; ?>>Amount (high to low)</option>
+                            <option value="amount_asc"<?php echo $sort === 'amount_asc' ? ' selected' : ''; ?>>Amount (low to high)</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-1">
+                        <label class="form-label small">Rows</label>
+                        <select name="per_page" class="form-select form-select-sm">
+                            <option value="20"<?php echo $perPage === 20 ? ' selected' : ''; ?>>20</option>
+                            <option value="50"<?php echo $perPage === 50 ? ' selected' : ''; ?>>50</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-2 d-flex gap-2">
                         <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-funnel"></i> Filter</button>
                         <a class="btn btn-sm btn-outline-secondary" href="expenses.php">Reset</a>
                     </div>
@@ -381,10 +449,36 @@ if (!empty($monthlyTotals)) {
                         </tbody>
                     </table>
                 </div>
+                <?php if ($totalRows > $perPage): ?>
+                    <?php
+                    $baseParams = [
+                        'from' => $from,
+                        'to' => $to,
+                        'sort' => $sort,
+                        'per_page' => $perPage,
+                    ];
+                    ?>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                        <span class="text-muted small">
+                            Showing <?php echo $totalRows > 0 ? ($offset + 1) : 0; ?>-<?php echo min($offset + count($expenses), $totalRows); ?> of <?php echo $totalRows; ?>
+                        </span>
+                        <div class="btn-group btn-group-sm" role="group" aria-label="Expenses pagination">
+                            <?php
+                            $prevParams = $baseParams;
+                            $prevParams['page'] = max(1, $page - 1);
+                            $nextParams = $baseParams;
+                            $nextParams['page'] = min($totalPages, $page + 1);
+                            ?>
+                            <a class="btn btn-outline-secondary<?php echo $page <= 1 ? ' disabled' : ''; ?>" href="expenses.php?<?php echo htmlspecialchars(http_build_query($prevParams)); ?>">Prev</a>
+                            <span class="btn btn-outline-secondary disabled">Page <?php echo $page; ?> / <?php echo $totalPages; ?></span>
+                            <a class="btn btn-outline-secondary<?php echo $page >= $totalPages ? ' disabled' : ''; ?>" href="expenses.php?<?php echo htmlspecialchars(http_build_query($nextParams)); ?>">Next</a>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
-<?php include 'partials/footer.php'; ?>
+<?php $showBackToTop = true; include 'partials/footer.php'; ?>
 

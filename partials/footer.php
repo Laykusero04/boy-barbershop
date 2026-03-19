@@ -2,6 +2,11 @@
                 <div class="card-footer bg-transparent border-0 pt-0">
                     <div class="bb-footer text-muted text-end">
                         Boy Barbershop
+                        <?php if (!empty($showBackToTop)): ?>
+                            <div class="small">
+                                <a href="#" class="text-muted text-decoration-none" aria-label="Back to top">Back to top</a>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
