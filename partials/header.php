@@ -37,6 +37,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggl
 }
 
 $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
+
+// Breadcrumbs from current script and GET (e.g. analytics.php?section=peak → Analytics > Peak & Daily Target)
+function bb_breadcrumbs(): array {
+    $script = basename($_SERVER['PHP_SELF'] ?? 'index.php');
+    $section = $_GET['section'] ?? '';
+    $labels = [
+        'index.php' => 'Dashboard',
+        'add_sale.php' => 'Add sale',
+        'barbers.php' => 'Barbers',
+        'services.php' => 'Services',
+        'payment_methods.php' => 'Payment methods',
+        'promos.php' => 'Promos',
+        'cash_flow.php' => 'Cash flow',
+        'expenses.php' => 'Expenses',
+        'investments.php' => 'Investments',
+        'reports.php' => 'Reports',
+        'sales_intelligence.php' => 'Sales Intelligence',
+        'owner_insights.php' => 'Owner pay & insights',
+        'analytics.php' => 'Analytics',
+        'inventory.php' => 'Inventory',
+    ];
+    $pageLabel = $labels[$script] ?? preg_replace('/\.php$/', '', $script);
+    if ($script === 'analytics.php' && $section !== '') {
+        $sectionLabels = ['activity' => 'Activity', 'peak' => 'Peak & Daily Target'];
+        $sectionLabel = $sectionLabels[$section] ?? $section;
+        return [
+            ['label' => $pageLabel, 'url' => 'analytics.php'],
+            ['label' => $sectionLabel, 'url' => null],
+        ];
+    }
+    return [['label' => $pageLabel, 'url' => null]];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="<?php echo $darkMode ? 'dark' : 'light'; ?>">
@@ -62,11 +94,14 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
 <body class="<?php echo $darkMode ? 'bb-dark' : ''; ?>">
 <nav class="navbar bb-navbar border-bottom bg-body-tertiary">
     <div class="container-fluid bb-navbar-inner py-2">
+        <button class="btn btn-link btn-lg p-2 d-md-none d-print-none bb-nav-trigger" type="button" data-bs-toggle="offcanvas" data-bs-target="#bb-offcanvas-nav" aria-controls="bb-offcanvas-nav" aria-label="Open menu">
+            <i class="bi bi-list"></i>
+        </button>
         <div class="bb-logo-wrap">
             <img src="assets/img/logo.png" alt="Boy Barbershop logo" />
             <div class="bb-brand">
                 BOY BARBERSHOP
-                <span class="text-muted">Tamnag, Lutayan, Sultan Kudarat</span>
+                <span class="text-muted d-none d-sm-inline">Tamnag, Lutayan, Sultan Kudarat</span>
             </div>
         </div>
 
@@ -81,65 +116,24 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
     </div>
 </nav>
 
+<!-- Mobile nav drawer -->
+<div class="offcanvas offcanvas-start d-md-none d-print-none" tabindex="-1" id="bb-offcanvas-nav" aria-labelledby="bb-offcanvas-nav-label">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title text-muted text-uppercase fw-semibold small" id="bb-offcanvas-nav-label">Navigation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body pt-0">
+        <?php $bb_nav_id_suffix = '-mob'; include __DIR__ . '/sidebar_nav.php'; ?>
+    </div>
+</div>
+
 <div class="container-fluid bb-shell py-4">
     <div class="row g-3">
-        <aside class="col-12 col-md-3 col-lg-2">
+        <aside class="col-12 col-md-3 col-lg-2 d-none d-md-block bb-sidebar-aside">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h6 class="text-muted text-uppercase fw-semibold mb-3 small">
-                        Navigation
-                    </h6>
-                    <nav class="nav flex-column bb-sidebar">
-                        <span class="text-muted text-uppercase fw-semibold small">Menu</span>
-                        <a href="index.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'index.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-house-door"></i><span>Dashboard</span>
-                        </a>
-                        <a href="add_sale.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'add_sale.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-plus-circle"></i><span>Add sale</span>
-                        </a>
-                        <a href="barbers.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'barbers.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-person-badge"></i><span>Barbers</span>
-                        </a>
-                        <a href="services.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'services.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-scissors"></i><span>Services</span>
-                        </a>
-                        <a href="payment_methods.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'payment_methods.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-wallet2"></i><span>Payment methods</span>
-                        </a>
-                        <a href="promos.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'promos.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-tag"></i><span>Promos</span>
-                        </a>
-                        <a href="cash_flow.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'cash_flow.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-cash-stack"></i><span>Cash flow</span>
-                        </a>
-                        <a href="expenses.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'expenses.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-receipt"></i><span>Expenses</span>
-                        </a>
-                        <a href="investments.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'investments.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-piggy-bank"></i><span>Investments</span>
-                        </a>
-                        <a href="reports.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'reports.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-file-earmark-text"></i><span>Reports</span>
-                        </a>
-                        <span class="text-muted text-uppercase fw-semibold small mt-2">Insights</span>
-                        <a href="sales_intelligence.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'sales_intelligence.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-graph-up-arrow"></i><span>Sales Intelligence</span>
-                        </a>
-                        <span class="text-muted text-uppercase fw-semibold small mt-2">Owner</span>
-                        <a href="owner_insights.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'owner_insights.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-wallet2"></i><span>Owner pay &amp; insights</span>
-                        </a>
-                        <span class="text-muted text-uppercase fw-semibold small mt-2">Peak</span>
-                        <a href="analytics.php?section=activity" class="nav-link bb-nav-sub <?php echo (basename($_SERVER['PHP_SELF']) === 'analytics.php' && ($_GET['section'] ?? '') === 'activity') ? 'active' : ''; ?>">
-                            <i class="bi bi-clock-history"></i><span>Usual customer activity by hour</span>
-                        </a>
-                        <a href="analytics.php?section=peak" class="nav-link bb-nav-sub <?php echo (basename($_SERVER['PHP_SELF']) === 'analytics.php' && ($_GET['section'] ?? 'peak') !== 'activity') ? 'active' : ''; ?>">
-                            <i class="bi bi-graph-up"></i><span>Peak (today) &amp; Daily Target</span>
-                        </a>
-                        <a href="inventory.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'inventory.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-box-seam"></i><span>Inventory</span>
-                        </a>
-                    </nav>
+                    <h6 class="text-muted text-uppercase fw-semibold mb-3 small">Navigation</h6>
+                    <?php include __DIR__ . '/sidebar_nav.php'; ?>
                 </div>
             </div>
         </aside>
@@ -147,3 +141,18 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
         <main class="col-12 col-md-9 col-lg-10 bb-main">
             <div class="bb-main-card card border-0 shadow-sm h-100">
                 <div class="card-body">
+                    <nav aria-label="breadcrumb" class="bb-breadcrumb mb-3">
+                        <ol class="breadcrumb mb-0">
+                            <?php
+                            $crumbs = bb_breadcrumbs();
+                            foreach ($crumbs as $i => $c) {
+                                $last = $i === count($crumbs) - 1;
+                                if ($last || $c['url'] === null) {
+                                    echo '<li class="breadcrumb-item active" aria-current="page">' . htmlspecialchars($c['label']) . '</li>';
+                                } else {
+                                    echo '<li class="breadcrumb-item"><a href="' . htmlspecialchars($c['url']) . '">' . htmlspecialchars($c['label']) . '</a></li>';
+                                }
+                            }
+                            ?>
+                        </ol>
+                    </nav>

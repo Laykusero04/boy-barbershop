@@ -553,3 +553,125 @@ body.bb-dark .bb-main .table-light th {
   align-items: center;
   gap: 0.4rem;
 }
+
+/* ---- Sidebar: collapsible groups ---- */
+.bb-sidebar-collapse .bb-sidebar-group {
+  margin-bottom: 0.25rem;
+}
+
+.bb-sidebar-toggler {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.25rem;
+  border: none;
+  border-radius: var(--bb-radius-sm);
+  background: transparent;
+  color: var(--bb-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.bb-sidebar-toggler:hover {
+  background: var(--bb-surface-2);
+  color: var(--bb-text);
+}
+
+.bb-sidebar-toggler:focus {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--bb-blue-soft);
+}
+
+.bb-sidebar-chevron {
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+}
+
+.bb-sidebar-toggler:not(.collapsed) .bb-sidebar-chevron {
+  transform: rotate(180deg);
+}
+
+.bb-sidebar-collapse .collapse {
+  padding-left: 0.25rem;
+}
+
+.bb-sidebar-collapse .collapse .nav-link {
+  padding-left: 0.9rem;
+}
+
+/* Navbar: hamburger trigger (mobile) */
+.bb-nav-trigger {
+  color: var(--bb-text) !important;
+  text-decoration: none;
+  margin-right: 0.25rem;
+}
+
+.bb-nav-trigger:hover {
+  color: var(--bb-blue) !important;
+}
+
+/* Offcanvas sidebar (mobile): match app surface */
+.offcanvas.offcanvas-start {
+  background: var(--bb-surface);
+  border-right: 1px solid var(--bb-border);
+}
+
+.offcanvas .bb-sidebar .nav-link {
+  border-radius: var(--bb-radius-sm);
+}
+
+/* Breadcrumbs */
+.bb-breadcrumb .breadcrumb {
+  font-size: 0.8rem;
+  background: transparent;
+  padding: 0;
+}
+
+.bb-breadcrumb .breadcrumb-item a {
+  color: var(--bb-blue);
+  text-decoration: none;
+}
+
+.bb-breadcrumb .breadcrumb-item a:hover {
+  text-decoration: underline;
+}
+
+.bb-breadcrumb .breadcrumb-item.active {
+  color: var(--bb-muted);
+}
+
+.bb-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+  color: var(--bb-muted);
+}
+
+/* FAB: Add sale on mobile */
+.bb-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 3.25rem;
+  height: 3.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  z-index: 1030;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bb-fab:hover {
+  color: #fff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+html[data-bs-theme="dark"] .bb-fab:hover,
+body.bb-dark .bb-fab:hover {
+  box-shadow: 0 4px 14px rgba(96, 165, 250, 0.35);
+}
