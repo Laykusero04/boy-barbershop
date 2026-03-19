@@ -16,9 +16,17 @@ if (!$promosTableExists) {
     exit;
 }
 
-// Handle create / update
+// Handle create / update / deactivate
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
+
+    if ($action === 'deactivate' && isset($_POST['id'])) {
+        $id = (int)$_POST['id'];
+        $pdo->prepare('UPDATE promos SET is_active = 0 WHERE id = ?')->execute([$id]);
+        header('Location: promos.php');
+        exit;
+    }
+
     $name = trim($_POST['name'] ?? '');
     $promoType = $_POST['promo_type'] ?? '';
     if (!in_array($promoType, ['percent_off', 'amount_off', 'free'], true)) {
@@ -45,13 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-if (isset($_GET['deactivate'])) {
-    $id = (int)$_GET['deactivate'];
-    $pdo->prepare('UPDATE promos SET is_active = 0 WHERE id = ?')->execute([$id]);
-    header('Location: promos.php');
-    exit;
-}
-
 if (isset($_GET['activate'])) {
     $id = (int)$_GET['activate'];
     $pdo->prepare('UPDATE promos SET is_active = 1 WHERE id = ?')->execute([$id]);
@@ -76,12 +77,12 @@ $promos = $pdo->query('SELECT * FROM promos ORDER BY is_active DESC, valid_to DE
         <h1 class="bb-page-title">Promos</h1>
         <p class="bb-page-subtitle">Create date-bound discounts (percent off, amount off, or free). Select at Add sale to apply.</p>
     </div>
-    <a href="promos.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add promo</a>
+    <a href="#bbPromoForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add promo</a>
 </div>
 
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="bb-section-card card">
+        <div class="bb-section-card card" id="bbPromoForm">
             <div class="card-body">
                 <h5 class="bb-section-title mb-3">
                     <i class="bi bi-tag"></i>
@@ -193,7 +194,7 @@ $promos = $pdo->query('SELECT * FROM promos ORDER BY is_active DESC, valid_to DE
                                     <td class="text-end">
                                         <a href="promos.php?edit=<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Edit</a>
                                         <?php if ($p['is_active']): ?>
-                                            <a href="promos.php?deactivate=<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-danger">Deactivate</a>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#bbDeactivatePromoModal" data-id="<?php echo (int)$p['id']; ?>" data-name="<?php echo htmlspecialchars($p['name']); ?>">Deactivate</button>
                                         <?php else: ?>
                                             <a href="promos.php?activate=<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-success">Activate</a>
                                         <?php endif; ?>
@@ -233,6 +234,44 @@ $promos = $pdo->query('SELECT * FROM promos ORDER BY is_active DESC, valid_to DE
     }
     typeSelect.addEventListener('change', updateValueLabel);
     updateValueLabel();
+})();
+</script>
+
+<!-- Deactivate promo confirmation -->
+<div class="modal fade" id="bbDeactivatePromoModal" tabindex="-1" aria-labelledby="bbDeactivatePromoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="bbDeactivatePromoModalLabel"><i class="bi bi-tag text-danger me-1"></i> Deactivate promo?</h6>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-2 small">
+                <p class="mb-0" id="bbDeactivatePromoDesc">It won't appear at Add sale.</p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="deactivate">
+                    <input type="hidden" name="id" id="bbDeactivatePromoId">
+                    <button type="submit" class="btn btn-sm btn-danger">Deactivate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('bbDeactivatePromoModal');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (e) {
+        var btn = e.relatedTarget;
+        if (!btn) return;
+        var id = btn.getAttribute('data-id');
+        var name = btn.getAttribute('data-name');
+        document.getElementById('bbDeactivatePromoId').value = id || '';
+        var desc = document.getElementById('bbDeactivatePromoDesc');
+        if (desc) desc.textContent = name ? ('Deactivate "' + name + '"? It won\'t appear at Add sale.') : 'It won\'t appear at Add sale.';
+    });
 })();
 </script>
 

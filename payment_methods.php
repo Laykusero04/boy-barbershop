@@ -1,9 +1,21 @@
 <?php
 require 'connection.php';
 
-// Handle create / update - redirect before any output
+// Handle create / update / deactivate - redirect before any output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
+
+    if ($action === 'deactivate' && isset($_POST['id'])) {
+        $id = (int)$_POST['id'];
+        try {
+            $pdo->prepare('UPDATE payment_methods SET is_active = 0 WHERE id = ?')->execute([$id]);
+        } catch (Throwable $e) {
+            // table may not exist yet
+        }
+        header('Location: payment_methods.php');
+        exit;
+    }
+
     $name = trim($_POST['name'] ?? '');
     $id = isset($_POST['id']) ? (int)$_POST['id'] : null;
 
@@ -23,17 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    header('Location: payment_methods.php');
-    exit;
-}
-
-if (isset($_GET['deactivate'])) {
-    $id = (int)$_GET['deactivate'];
-    try {
-        $pdo->prepare('UPDATE payment_methods SET is_active = 0 WHERE id = ?')->execute([$id]);
-    } catch (Throwable $e) {
-        // table may not exist yet
-    }
     header('Location: payment_methods.php');
     exit;
 }
@@ -64,12 +65,12 @@ try {
         <h1 class="bb-page-title">Payment methods</h1>
         <p class="bb-page-subtitle">Manage payment options shown in Add Sale. Active methods appear in the dropdown.</p>
     </div>
-    <a href="payment_methods.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add payment method</a>
+    <a href="#bbPaymentMethodForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add payment method</a>
 </div>
 
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="bb-section-card card">
+        <div class="bb-section-card card" id="bbPaymentMethodForm">
             <div class="card-body">
                 <h5 class="bb-section-title mb-3">
                     <i class="bi bi-wallet2"></i>
@@ -137,7 +138,7 @@ try {
                                 <td class="text-end">
                                     <a href="payment_methods.php?edit=<?php echo $pm['id']; ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Edit</a>
                                     <?php if ($pm['is_active']): ?>
-                                        <a href="payment_methods.php?deactivate=<?php echo $pm['id']; ?>" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Deactivate</a>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#bbDeactivatePaymentMethodModal" data-id="<?php echo (int)$pm['id']; ?>" data-name="<?php echo htmlspecialchars($pm['name']); ?>"><i class="bi bi-x-circle"></i> Deactivate</button>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -150,5 +151,43 @@ try {
         </div>
     </div>
 </div>
+
+<!-- Deactivate payment method confirmation -->
+<div class="modal fade" id="bbDeactivatePaymentMethodModal" tabindex="-1" aria-labelledby="bbDeactivatePaymentMethodModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="bbDeactivatePaymentMethodModalLabel"><i class="bi bi-x-circle text-danger me-1"></i> Deactivate payment method?</h6>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-2 small">
+                <p class="mb-0" id="bbDeactivatePaymentMethodDesc">It won't appear at Add sale.</p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="deactivate">
+                    <input type="hidden" name="id" id="bbDeactivatePaymentMethodId">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-x-circle"></i> Deactivate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('bbDeactivatePaymentMethodModal');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (e) {
+        var btn = e.relatedTarget;
+        if (!btn) return;
+        var id = btn.getAttribute('data-id');
+        var name = btn.getAttribute('data-name');
+        document.getElementById('bbDeactivatePaymentMethodId').value = id || '';
+        var desc = document.getElementById('bbDeactivatePaymentMethodDesc');
+        if (desc) desc.textContent = name ? ('Deactivate "' + name + '"? It won\'t appear at Add sale.') : 'It won\'t appear at Add sale.';
+    });
+})();
+</script>
 
 <?php include 'partials/footer.php'; ?>

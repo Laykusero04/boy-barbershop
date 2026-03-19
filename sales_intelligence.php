@@ -135,7 +135,7 @@ if (!empty($serviceStats) && $totalRevenue > 0) {
         <h1 class="bb-page-title">Sales Intelligence</h1>
         <p class="bb-page-subtitle">Best and worst services, revenue per service, and barber performance over time to optimize pricing and promos.</p>
     </div>
-    <a href="index.php" class="btn btn-sm btn-outline-secondary"><i class="bi bi-house"></i> Dashboard</a>
+    <a href="add_sale.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add sale</a>
 </div>
 
 <?php if ($totalCount === 0): ?>

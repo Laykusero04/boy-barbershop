@@ -47,7 +47,10 @@ try {
         <h1 class="bb-page-title">Investments</h1>
         <p class="bb-page-subtitle">Record equipment and capital. Used for ROI on the dashboard.</p>
     </div>
-    <div class="fw-semibold">Total: ₱<?php echo number_format($totalInvestment, 2, '.', ','); ?></div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="text-muted small">Total: ₱<?php echo number_format($totalInvestment, 2, '.', ','); ?></span>
+        <a href="#bbInvestmentForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add investment</a>
+    </div>
 </div>
 
 <?php if ($message): ?>
@@ -56,7 +59,7 @@ try {
 
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="bb-section-card card">
+        <div class="bb-section-card card" id="bbInvestmentForm">
             <div class="card-body">
                 <h5 class="bb-section-title mb-3"><i class="bi bi-piggy-bank"></i> Add investment item</h5>
                 <form method="post" class="vstack gap-3">
@@ -66,7 +69,8 @@ try {
                     </div>
                     <div>
                         <label class="form-label small">Cost</label>
-                        <input type="text" name="cost" id="bbInvestmentCost" class="form-control form-control-sm" inputmode="decimal" placeholder="Cost" required autocomplete="off">
+                        <input type="number" name="cost" id="bbInvestmentCost" class="form-control form-control-sm" step="0.01" min="0" placeholder="Cost" required autocomplete="off">
+                        <div class="form-text small">Enter 0 or more. Negative values are invalid.</div>
                     </div>
                     <div>
                         <label class="form-label small">Date (optional)</label>

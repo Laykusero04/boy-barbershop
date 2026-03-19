@@ -3,11 +3,18 @@ require 'connection.php';
 
 $message = null;
 
-// Handle create/update
+// Handle create/update/deactivate
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
-    $id = isset($_POST['id']) ? (int)$_POST['id'] : null;
 
+    if ($action === 'deactivate' && isset($_POST['id'])) {
+        $id = (int)$_POST['id'];
+        $pdo->prepare('UPDATE inventory_items SET is_active = 0 WHERE id = ?')->execute([$id]);
+        header('Location: inventory.php');
+        exit;
+    }
+
+    $id = isset($_POST['id']) ? (int)$_POST['id'] : null;
     $itemName = trim($_POST['item_name'] ?? '');
     $stockQty = (int)($_POST['stock_qty'] ?? 0);
     $threshold = (int)($_POST['low_stock_threshold'] ?? 5);
@@ -38,14 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Deactivate
-if (isset($_GET['deactivate'])) {
-    $id = (int)$_GET['deactivate'];
-    $pdo->prepare('UPDATE inventory_items SET is_active = 0 WHERE id = ?')->execute([$id]);
-    header('Location: inventory.php');
-    exit;
-}
-
 // Edit
 $editItem = null;
 if (isset($_GET['edit'])) {
@@ -60,9 +59,12 @@ $items = $pdo->query('SELECT * FROM inventory_items ORDER BY is_active DESC, ite
 
 <?php include 'partials/header.php'; ?>
 
-<div class="mb-4">
-    <h1 class="bb-page-title">Inventory</h1>
-    <p class="bb-page-subtitle">Track stock and see low-stock alerts. Set a threshold per item.</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="bb-page-title">Inventory</h1>
+        <p class="bb-page-subtitle">Track stock and see low-stock alerts. Set a threshold per item.</p>
+    </div>
+    <a href="#bbInventoryForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add item</a>
 </div>
 
 <?php if ($message): ?>
@@ -71,7 +73,7 @@ $items = $pdo->query('SELECT * FROM inventory_items ORDER BY is_active DESC, ite
 
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="bb-section-card card">
+        <div class="bb-section-card card" id="bbInventoryForm">
             <div class="card-body">
                 <h5 class="bb-section-title mb-3"><i class="bi bi-box-seam"></i> <?php echo $editItem ? 'Edit item' : 'Add item'; ?></h5>
                 <form method="post" class="vstack gap-3">
@@ -173,7 +175,7 @@ $items = $pdo->query('SELECT * FROM inventory_items ORDER BY is_active DESC, ite
                                     <td class="text-end">
                                         <a class="btn btn-sm btn-outline-secondary" href="inventory.php?edit=<?php echo (int)$it['id']; ?>"><i class="bi bi-pencil"></i> Edit</a>
                                         <?php if ($it['is_active']): ?>
-                                            <a class="btn btn-sm btn-outline-danger" href="inventory.php?deactivate=<?php echo (int)$it['id']; ?>"><i class="bi bi-x-circle"></i> Deactivate</a>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#bbDeactivateInventoryModal" data-id="<?php echo (int)$it['id']; ?>" data-name="<?php echo htmlspecialchars($it['item_name']); ?>"><i class="bi bi-x-circle"></i> Deactivate</button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -186,6 +188,44 @@ $items = $pdo->query('SELECT * FROM inventory_items ORDER BY is_active DESC, ite
         </div>
     </div>
 </div>
+
+<!-- Deactivate inventory item confirmation -->
+<div class="modal fade" id="bbDeactivateInventoryModal" tabindex="-1" aria-labelledby="bbDeactivateInventoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="bbDeactivateInventoryModalLabel"><i class="bi bi-x-circle text-danger me-1"></i> Deactivate item?</h6>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-2 small">
+                <p class="mb-0" id="bbDeactivateInventoryDesc">It won't appear in inventory lists.</p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" class="d-inline">
+                    <input type="hidden" name="action" value="deactivate">
+                    <input type="hidden" name="id" id="bbDeactivateInventoryId">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-x-circle"></i> Deactivate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('bbDeactivateInventoryModal');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (e) {
+        var btn = e.relatedTarget;
+        if (!btn) return;
+        var id = btn.getAttribute('data-id');
+        var name = btn.getAttribute('data-name');
+        document.getElementById('bbDeactivateInventoryId').value = id || '';
+        var desc = document.getElementById('bbDeactivateInventoryDesc');
+        if (desc) desc.textContent = name ? ('Deactivate "' + name + '"? It won\'t appear in inventory lists.') : 'It won\'t appear in inventory lists.';
+    });
+})();
+</script>
 
 <?php include 'partials/footer.php'; ?>
 

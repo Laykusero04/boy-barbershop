@@ -15,6 +15,14 @@ try {
 // Handle create / update / deactivate (before any output so redirect works)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
+
+    if ($action === 'deactivate' && isset($_POST['id'])) {
+        $id = (int)$_POST['id'];
+        $pdo->prepare('UPDATE services SET is_active = 0 WHERE id = ?')->execute([$id]);
+        header('Location: services.php');
+        exit;
+    }
+
     $name = trim($_POST['name'] ?? '');
     $price = (float)($_POST['default_price'] ?? 0);
     $id = isset($_POST['id']) ? (int)$_POST['id'] : null;
@@ -53,13 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-if (isset($_GET['deactivate'])) {
-    $id = (int)$_GET['deactivate'];
-    $pdo->prepare('UPDATE services SET is_active = 0 WHERE id = ?')->execute([$id]);
-    header('Location: services.php');
-    exit;
-}
-
 $editService = null;
 $usageByItem = []; // inventory_item_id => quantity_per_service (when editing)
 if (isset($_GET['edit'])) {
@@ -89,12 +90,12 @@ $services = $pdo->query('SELECT * FROM services ORDER BY is_active DESC, name')-
         <h1 class="bb-page-title">Services</h1>
         <p class="bb-page-subtitle">Add and manage services with default prices. Used when recording sales.</p>
     </div>
-    <a href="services.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add service</a>
+    <a href="#bbServiceForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add service</a>
 </div>
 
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="bb-section-card card">
+        <div class="bb-section-card card" id="bbServiceForm">
             <div class="card-body">
                 <h5 class="bb-section-title mb-3">
                     <i class="bi bi-scissors"></i>
@@ -192,7 +193,7 @@ $services = $pdo->query('SELECT * FROM services ORDER BY is_active DESC, name')-
                                 <td class="text-end">
                                     <a href="services.php?edit=<?php echo $service['id']; ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Edit</a>
                                     <?php if ($service['is_active']): ?>
-                                        <a href="services.php?deactivate=<?php echo $service['id']; ?>" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Deactivate</a>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#bbDeactivateServiceModal" data-id="<?php echo (int)$service['id']; ?>" data-name="<?php echo htmlspecialchars($service['name']); ?>"><i class="bi bi-x-circle"></i> Deactivate</button>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -204,6 +205,44 @@ $services = $pdo->query('SELECT * FROM services ORDER BY is_active DESC, name')-
         </div>
     </div>
 </div>
+
+<!-- Deactivate service confirmation -->
+<div class="modal fade" id="bbDeactivateServiceModal" tabindex="-1" aria-labelledby="bbDeactivateServiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="bbDeactivateServiceModalLabel"><i class="bi bi-x-circle text-danger me-1"></i> Deactivate service?</h6>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-2 small">
+                <p class="mb-0" id="bbDeactivateServiceDesc">It won't appear in new sales.</p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" id="bbDeactivateServiceForm" class="d-inline">
+                    <input type="hidden" name="action" value="deactivate">
+                    <input type="hidden" name="id" id="bbDeactivateServiceId">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-x-circle"></i> Deactivate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('bbDeactivateServiceModal');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (e) {
+        var btn = e.relatedTarget;
+        if (!btn) return;
+        var id = btn.getAttribute('data-id');
+        var name = btn.getAttribute('data-name');
+        document.getElementById('bbDeactivateServiceId').value = id || '';
+        var desc = document.getElementById('bbDeactivateServiceDesc');
+        if (desc) desc.textContent = name ? ('Deactivate "' + name + '"? It won\'t appear in new sales.') : 'It won\'t appear in new sales.';
+    });
+})();
+</script>
 
 <?php include 'partials/footer.php'; ?>
 

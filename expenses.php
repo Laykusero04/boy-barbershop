@@ -163,9 +163,12 @@ if (!empty($monthlyTotals)) {
 
 <?php include 'partials/header.php'; ?>
 
-<div class="mb-4">
-    <h1 class="bb-page-title">Expenses</h1>
-    <p class="bb-page-subtitle">Track rent, supplies, and other costs. Filter by date range to see totals.</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="bb-page-title">Expenses</h1>
+        <p class="bb-page-subtitle">Track rent, supplies, and other costs. Filter by date range to see totals.</p>
+    </div>
+    <a href="#bbExpenseForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add expense</a>
 </div>
 
 <?php if ($message): ?>
@@ -272,7 +275,7 @@ if (!empty($monthlyTotals)) {
 
 <div class="row g-4">
     <div class="col-md-4">
-        <div class="bb-section-card card">
+        <div class="bb-section-card card" id="bbExpenseForm">
             <div class="card-body">
                 <h5 class="bb-section-title mb-3"><i class="bi bi-receipt"></i> Add expense</h5>
                 <form method="post" class="vstack gap-3">
@@ -291,6 +294,7 @@ if (!empty($monthlyTotals)) {
                     <div>
                         <label class="form-label small">Amount</label>
                         <input type="number" name="amount" class="form-control form-control-sm" step="0.01" min="0" required>
+                        <div class="form-text small">Enter 0 or more. Negative values are invalid.</div>
                     </div>
                     <?php if ($hasExpenseType): ?>
                     <div>

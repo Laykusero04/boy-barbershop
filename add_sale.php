@@ -354,9 +354,9 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                 <input type="hidden" name="sale_id" value="<?php echo (int)$editSale['id']; ?>">
                 <input type="hidden" name="day" value="<?php echo htmlspecialchars($day); ?>">
             <?php endif; ?>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
                 <label class="form-label"><i class="bi bi-person-badge text-muted me-1"></i> Barber</label>
-                <select name="barber_id" class="form-select form-select-sm" required autofocus>
+                <select name="barber_id" id="bbBarberSelect" class="form-select form-select-sm" required autofocus aria-describedby="bbBarberError">
                     <option value="">Select barber</option>
                     <?php foreach ($barbers as $barber): ?>
                         <option value="<?php echo $barber['id']; ?>"<?php echo ($editSale && (int)$editSale['barber_id'] === (int)$barber['id']) ? ' selected' : ''; ?>>
@@ -364,10 +364,11 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <div class="invalid-feedback" id="bbBarberError">Please select a barber.</div>
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
                 <label class="form-label"><i class="bi bi-scissors text-muted me-1"></i> Service</label>
-                <select name="service_id" class="form-select form-select-sm" required>
+                <select name="service_id" id="bbServiceSelect" class="form-select form-select-sm" required aria-describedby="bbServiceError">
                     <option value="">Select service</option>
                     <?php foreach ($services as $service): ?>
                         <option
@@ -379,8 +380,9 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <div class="invalid-feedback" id="bbServiceError">Please select a service.</div>
             </div>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
                 <label class="form-label"><i class="bi bi-currency-exchange text-muted me-1"></i> Price (amount to charge)</label>
                 <input
                     type="number"
@@ -391,15 +393,15 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                     min="0"
                     required
                     value="<?php echo $editSale ? htmlspecialchars((string)($editSale['price'] ?? '')) : ''; ?>"
+                    aria-describedby="bbPriceHint bbPriceError"
                 >
                 <input type="hidden" name="original_price" id="bbOriginalPrice" value="<?php echo $editSale && isset($editSale['original_price']) ? htmlspecialchars((string)$editSale['original_price']) : ''; ?>">
                 <input type="hidden" name="discount_amount" id="bbDiscountAmount" value="<?php echo $editSale && isset($editSale['discount_amount']) ? htmlspecialchars((string)$editSale['discount_amount']) : ''; ?>">
-                <div class="form-text small">
-                    Auto-fills from service. With a promo selected, updates to discounted amount.
-                </div>
+                <div class="form-text small" id="bbPriceHint">Auto-fills from service. With a promo selected, updates to discounted amount. Use 0 or more; negative values are invalid.</div>
+                <div class="invalid-feedback" id="bbPriceError">Enter a valid price (0 or more).</div>
             </div>
             <?php if ($salesHasPromoColumns && !empty($promos)): ?>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
                 <label class="form-label"><i class="bi bi-tag text-muted me-1"></i> Promo</label>
                 <select name="promo_id" id="bbPromoSelect" class="form-select form-select-sm">
                     <option value="">— No promo —</option>
@@ -419,7 +421,7 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                 </select>
             </div>
             <?php endif; ?>
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
                 <label class="form-label"><i class="bi bi-wallet2 text-muted me-1"></i> Payment method</label>
                 <select name="payment_method" class="form-select form-select-sm">
                     <option value="">— Select or leave empty —</option>
@@ -431,7 +433,7 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                     <div class="form-text small"><a href="payment_methods.php">Add payment methods</a> to show them here.</div>
                 <?php endif; ?>
             </div>
-            <div class="col-md-8">
+            <div class="col-12 col-md-8">
                 <label class="form-label"><i class="bi bi-chat-left-text text-muted me-1"></i> Notes</label>
                 <input
                     type="text"
@@ -442,7 +444,7 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                 >
             </div>
             <div class="col-12 d-flex flex-wrap gap-2 align-items-center pt-1">
-                <button type="submit" id="bbSubmitSaleBtn" class="btn btn-bb-primary"><i class="bi bi-check-lg"></i> <?php echo $editSale ? 'Save changes' : 'Save sale'; ?></button>
+                <button type="submit" id="bbSubmitSaleBtn" class="btn btn-bb-primary"><i class="bi bi-check-lg"></i> <span class="bb-submit-text"><?php echo $editSale ? 'Save changes' : 'Save sale'; ?></span></button>
                 <?php if ($editSale): ?>
                     <a href="add_sale.php?day=<?php echo urlencode($day); ?>" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i> Cancel edit</a>
                 <?php endif; ?>
@@ -651,8 +653,49 @@ window.bbLastSale = <?php echo $lastSale ? json_encode($lastSale) : 'null'; ?>;
     var serviceSelect = form && form.querySelector('select[name="service_id"]');
     var priceInput = form && form.querySelector('input[name="price"]');
     var paymentSelect = form && form.querySelector('select[name="payment_method"]');
+    var submitBtn = document.getElementById('bbSubmitSaleBtn');
+    var submitText = submitBtn && submitBtn.querySelector('.bb-submit-text');
 
     if (!form || !barberSelect || !serviceSelect || !priceInput) return;
+
+    function validateBarber() {
+        var ok = barberSelect.value.trim() !== '';
+        barberSelect.classList.toggle('is-invalid', !ok);
+        return ok;
+    }
+    function validateService() {
+        var ok = serviceSelect.value.trim() !== '';
+        serviceSelect.classList.toggle('is-invalid', !ok);
+        return ok;
+    }
+    function validatePrice() {
+        var val = parseFloat(priceInput.value);
+        var ok = !isNaN(val) && val >= 0;
+        priceInput.classList.toggle('is-invalid', !ok);
+        return ok;
+    }
+    function validateAll() {
+        var a = validateBarber();
+        var b = validateService();
+        var c = validatePrice();
+        return a && b && c;
+    }
+
+    barberSelect.addEventListener('blur', validateBarber);
+    serviceSelect.addEventListener('blur', validateService);
+    priceInput.addEventListener('blur', validatePrice);
+    priceInput.addEventListener('input', function () { if (priceInput.classList.contains('is-invalid')) validatePrice(); });
+
+    form.addEventListener('submit', function (e) {
+        if (!validateAll()) {
+            e.preventDefault();
+            return;
+        }
+        if (submitBtn && submitText) {
+            submitBtn.disabled = true;
+            submitText.textContent = 'Saving…';
+        }
+    });
 
     // Enter = submit (except when in select, so dropdown can be used)
     form.addEventListener('keydown', function (e) {
