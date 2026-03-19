@@ -26,8 +26,59 @@ try {
 }
 
 $message = null;
+$day = $_GET['day'] ?? date('Y-m-d');
+$day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) ? $day : date('Y-m-d');
+if (isset($_GET['msg'])) {
+    $message = $_GET['msg'];
+}
+
+// Helper: restore inventory for a service (reverse of deduct)
+$restoreInventoryForService = function ($serviceId) use ($pdo) {
+    try {
+        $usageStmt = $pdo->prepare('
+            SELECT u.inventory_item_id, u.quantity_per_service
+            FROM service_inventory_usage u
+            JOIN inventory_items i ON i.id = u.inventory_item_id AND i.is_active = 1
+            WHERE u.service_id = ?
+        ');
+        $usageStmt->execute([$serviceId]);
+        $usages = $usageStmt->fetchAll();
+        $addStmt = $pdo->prepare('UPDATE inventory_items SET stock_qty = stock_qty + ? WHERE id = ?');
+        foreach ($usages as $u) {
+            $addStmt->execute([(float)$u['quantity_per_service'], (int)$u['inventory_item_id']]);
+        }
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // ----- Delete sale -----
+    if (isset($_POST['action']) && $_POST['action'] === 'delete' && isset($_POST['id'])) {
+        $saleId = (int)$_POST['id'];
+        $redirectDay = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['day'] ?? '') ? $_POST['day'] : date('Y-m-d');
+        $row = $pdo->prepare('SELECT id, service_id FROM sales WHERE id = ?');
+        $row->execute([$saleId]);
+        $sale = $row->fetch();
+        if ($sale) {
+            try {
+                $pdo->beginTransaction();
+                $restoreInventoryForService((int)$sale['service_id']);
+                $pdo->prepare('DELETE FROM sales WHERE id = ?')->execute([$saleId]);
+                $pdo->commit();
+                $message = 'Sale deleted. Inventory restored.';
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $message = 'Error deleting sale: ' . htmlspecialchars($e->getMessage());
+            }
+        } else {
+            $message = 'Sale not found.';
+        }
+        header('Location: add_sale.php?day=' . urlencode($redirectDay) . '&msg=' . urlencode($message));
+        exit;
+    }
+
     $barberId = (int)($_POST['barber_id'] ?? 0);
     $serviceId = (int)($_POST['service_id'] ?? 0);
     $price = (float)($_POST['price'] ?? 0);
@@ -36,12 +87,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $promoId = isset($_POST['promo_id']) && $_POST['promo_id'] !== '' ? (int)$_POST['promo_id'] : null;
     $originalPrice = isset($_POST['original_price']) && $_POST['original_price'] !== '' ? (float)$_POST['original_price'] : null;
     $discountAmount = isset($_POST['discount_amount']) && $_POST['discount_amount'] !== '' ? (float)$_POST['discount_amount'] : null;
+    $saleId = isset($_POST['sale_id']) && $_POST['sale_id'] !== '' ? (int)$_POST['sale_id'] : null;
 
-    if ($barberId && $serviceId && $price >= 0) {
+    // ----- Update sale -----
+    if ($saleId && $barberId && $serviceId && $price >= 0) {
+        $existing = $pdo->prepare('SELECT id, service_id FROM sales WHERE id = ?');
+        $existing->execute([$saleId]);
+        $existingSale = $existing->fetch();
+        if (!$existingSale) {
+            $message = 'Sale not found.';
+        } else {
+            $oldServiceId = (int)$existingSale['service_id'];
+            try {
+                $pdo->beginTransaction();
+                if ($oldServiceId !== $serviceId) {
+                    $restoreInventoryForService($oldServiceId);
+                    $usageStmt = $pdo->prepare('
+                        SELECT u.inventory_item_id, u.quantity_per_service, i.item_name, i.stock_qty
+                        FROM service_inventory_usage u
+                        JOIN inventory_items i ON i.id = u.inventory_item_id AND i.is_active = 1
+                        WHERE u.service_id = ?
+                    ');
+                    $usageStmt->execute([$serviceId]);
+                    $usages = $usageStmt->fetchAll();
+                    $insufficientItem = null;
+                    foreach ($usages as $u) {
+                        $required = (float)$u['quantity_per_service'];
+                        $stock = (float)$u['stock_qty'];
+                        if ($stock < $required) {
+                            $insufficientItem = $u;
+                            break;
+                        }
+                    }
+                    if ($insufficientItem !== null) {
+                        $pdo->rollBack();
+                        $message = 'Cannot change service: insufficient stock for ' . htmlspecialchars($insufficientItem['item_name']) . '.';
+                    } else {
+                        $deductStmt = $pdo->prepare('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?');
+                        foreach ($usages as $u) {
+                            $deductStmt->execute([(float)$u['quantity_per_service'], (int)$u['inventory_item_id']]);
+                        }
+                    }
+                }
+                if (!isset($insufficientItem) || $insufficientItem === null) {
+                    if ($salesHasPromoColumns) {
+                        $pdo->prepare('
+                            UPDATE sales SET barber_id = ?, service_id = ?, price = ?, payment_method = ?, notes = ?, promo_id = ?, original_price = ?, discount_amount = ?
+                            WHERE id = ?
+                        ')->execute([$barberId, $serviceId, $price, $paymentMethod, $notes, $promoId ?: null, $originalPrice, $discountAmount, $saleId]);
+                    } else {
+                        $pdo->prepare('
+                            UPDATE sales SET barber_id = ?, service_id = ?, price = ?, payment_method = ?, notes = ?
+                            WHERE id = ?
+                        ')->execute([$barberId, $serviceId, $price, $paymentMethod, $notes, $saleId]);
+                    }
+                    $pdo->commit();
+                    $redirectDay = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['day'] ?? '') ? $_POST['day'] : date('Y-m-d');
+                    header('Location: add_sale.php?day=' . urlencode($redirectDay) . '&msg=' . urlencode('Sale updated.'));
+                    exit;
+                }
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                $message = 'Error updating sale: ' . htmlspecialchars($e->getMessage());
+            }
+        }
+    }
+    // ----- Create sale -----
+    elseif (!$saleId && $barberId && $serviceId && $price >= 0) {
         try {
             $pdo->beginTransaction();
 
-            // Load inventory usage for this service (active items only)
             $usageStmt = $pdo->prepare('
                 SELECT u.inventory_item_id, u.quantity_per_service, i.item_name, i.stock_qty
                 FROM service_inventory_usage u
@@ -104,14 +219,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Error adding sale: ' . htmlspecialchars($e->getMessage());
             }
         }
-    } else {
+    } elseif (!$saleId) {
         $message = 'Please fill all required fields.';
     }
 }
 
 // Daily per-barber service breakdown (for payroll / report) — after POST so new sale is included
-$day = $_GET['day'] ?? date('Y-m-d');
-$day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) ? $day : date('Y-m-d');
 $dayStart = $day . ' 00:00:00';
 $dayEnd = $day . ' 23:59:59';
 
@@ -169,6 +282,31 @@ if ($lastSaleRow) {
         'payment_method' => (string)($lastSaleRow['payment_method'] ?? ''),
     ];
 }
+
+// Individual sales for the selected day (for edit/delete list)
+$salesForDayStmt = $pdo->prepare('
+    SELECT s.id, s.sale_datetime, s.barber_id, b.name AS barber_name, s.service_id, sv.name AS service_name, s.price, s.payment_method, s.notes
+    FROM sales s
+    JOIN barbers b ON s.barber_id = b.id
+    JOIN services sv ON s.service_id = sv.id
+    WHERE s.sale_datetime BETWEEN ? AND ?
+    ORDER BY s.sale_datetime DESC
+');
+$salesForDayStmt->execute([$dayStart, $dayEnd]);
+$salesForDay = $salesForDayStmt->fetchAll();
+
+// Edit mode: load sale to pre-fill form
+$editSale = null;
+if (isset($_GET['edit']) && $_GET['edit'] !== '') {
+    $editId = (int)$_GET['edit'];
+    $editCols = 'id, barber_id, service_id, price, payment_method, notes';
+    if ($salesHasPromoColumns) {
+        $editCols .= ', promo_id, original_price, discount_amount';
+    }
+    $editStmt = $pdo->prepare('SELECT ' . $editCols . ' FROM sales WHERE id = ?');
+    $editStmt->execute([$editId]);
+    $editSale = $editStmt->fetch();
+}
 ?>
 <?php include 'partials/header.php'; ?>
 
@@ -212,12 +350,16 @@ if ($lastSaleRow) {
         <?php endif; ?>
 
         <form method="post" id="bbAddSaleForm" class="row g-3">
+            <?php if ($editSale): ?>
+                <input type="hidden" name="sale_id" value="<?php echo (int)$editSale['id']; ?>">
+                <input type="hidden" name="day" value="<?php echo htmlspecialchars($day); ?>">
+            <?php endif; ?>
             <div class="col-md-4">
                 <label class="form-label"><i class="bi bi-person-badge text-muted me-1"></i> Barber</label>
                 <select name="barber_id" class="form-select form-select-sm" required autofocus>
                     <option value="">Select barber</option>
                     <?php foreach ($barbers as $barber): ?>
-                        <option value="<?php echo $barber['id']; ?>">
+                        <option value="<?php echo $barber['id']; ?>"<?php echo ($editSale && (int)$editSale['barber_id'] === (int)$barber['id']) ? ' selected' : ''; ?>>
                             <?php echo htmlspecialchars($barber['name']); ?>
                         </option>
                     <?php endforeach; ?>
@@ -231,6 +373,7 @@ if ($lastSaleRow) {
                         <option
                             value="<?php echo $service['id']; ?>"
                             data-price="<?php echo htmlspecialchars($service['default_price']); ?>"
+                            <?php echo ($editSale && (int)$editSale['service_id'] === (int)$service['id']) ? ' selected' : ''; ?>
                         >
                             <?php echo htmlspecialchars($service['name']); ?>
                         </option>
@@ -247,9 +390,10 @@ if ($lastSaleRow) {
                     step="0.01"
                     min="0"
                     required
+                    value="<?php echo $editSale ? htmlspecialchars((string)($editSale['price'] ?? '')) : ''; ?>"
                 >
-                <input type="hidden" name="original_price" id="bbOriginalPrice">
-                <input type="hidden" name="discount_amount" id="bbDiscountAmount">
+                <input type="hidden" name="original_price" id="bbOriginalPrice" value="<?php echo $editSale && isset($editSale['original_price']) ? htmlspecialchars((string)$editSale['original_price']) : ''; ?>">
+                <input type="hidden" name="discount_amount" id="bbDiscountAmount" value="<?php echo $editSale && isset($editSale['discount_amount']) ? htmlspecialchars((string)$editSale['discount_amount']) : ''; ?>">
                 <div class="form-text small">
                     Auto-fills from service. With a promo selected, updates to discounted amount.
                 </div>
@@ -262,7 +406,8 @@ if ($lastSaleRow) {
                     <?php foreach ($promos as $pr): ?>
                         <option value="<?php echo (int)$pr['id']; ?>"
                             data-type="<?php echo htmlspecialchars($pr['promo_type']); ?>"
-                            data-value="<?php echo htmlspecialchars($pr['value']); ?>">
+                            data-value="<?php echo htmlspecialchars($pr['value']); ?>"
+                            <?php echo ($editSale && isset($editSale['promo_id']) && (int)$editSale['promo_id'] === (int)$pr['id']) ? ' selected' : ''; ?>>
                             <?php echo htmlspecialchars($pr['name']); ?>
                             (<?php
                             if ($pr['promo_type'] === 'free') echo 'Free';
@@ -279,7 +424,7 @@ if ($lastSaleRow) {
                 <select name="payment_method" class="form-select form-select-sm">
                     <option value="">— Select or leave empty —</option>
                     <?php foreach ($paymentMethods as $pm): ?>
-                        <option value="<?php echo htmlspecialchars($pm['name']); ?>"<?php echo ($defaultPaymentMethod !== null && $pm['name'] === $defaultPaymentMethod) ? ' selected' : ''; ?>><?php echo htmlspecialchars($pm['name']); ?></option>
+                        <option value="<?php echo htmlspecialchars($pm['name']); ?>"<?php echo (($editSale && isset($editSale['payment_method']) && $pm['name'] === $editSale['payment_method']) || (!$editSale && $defaultPaymentMethod !== null && $pm['name'] === $defaultPaymentMethod)) ? ' selected' : ''; ?>><?php echo htmlspecialchars($pm['name']); ?></option>
                     <?php endforeach; ?>
                 </select>
                 <?php if (empty($paymentMethods)): ?>
@@ -293,16 +438,109 @@ if ($lastSaleRow) {
                     name="notes"
                     class="form-control form-control-sm"
                     placeholder="Optional"
+                    value="<?php echo $editSale ? htmlspecialchars((string)($editSale['notes'] ?? '')) : ''; ?>"
                 >
             </div>
             <div class="col-12 d-flex flex-wrap gap-2 align-items-center pt-1">
-                <button type="submit" id="bbSubmitSaleBtn" class="btn btn-bb-primary"><i class="bi bi-check-lg"></i> Save sale</button>
+                <button type="submit" id="bbSubmitSaleBtn" class="btn btn-bb-primary"><i class="bi bi-check-lg"></i> <?php echo $editSale ? 'Save changes' : 'Save sale'; ?></button>
+                <?php if ($editSale): ?>
+                    <a href="add_sale.php?day=<?php echo urlencode($day); ?>" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i> Cancel edit</a>
+                <?php endif; ?>
                 <a href="index.php" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Dashboard</a>
                 <span class="text-muted small ms-1"><kbd>Enter</kbd> = submit</span>
             </div>
         </form>
     </div>
 </div>
+
+<!-- Sales for selected day: edit / delete -->
+<div class="bb-section-card card mt-4">
+    <div class="card-body">
+        <h5 class="bb-section-title mb-3"><i class="bi bi-list-check"></i> Sales for <?php echo htmlspecialchars($day); ?></h5>
+        <form method="get" class="d-flex align-items-end gap-2 mb-3">
+            <div class="flex-grow-1">
+                <label class="form-label small mb-1">Date</label>
+                <input type="date" name="day" value="<?php echo htmlspecialchars($day); ?>" class="form-control form-control-sm">
+            </div>
+            <button class="btn btn-sm btn-bb-primary" type="submit"><i class="bi bi-eye"></i> View</button>
+        </form>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Barber</th>
+                    <th>Service</th>
+                    <th class="text-end">Price</th>
+                    <th class="text-end" style="width: 1%;">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($salesForDay)): ?>
+                    <tr>
+                        <td colspan="5" class="p-0">
+                            <div class="bb-empty py-3"><i class="bi bi-inbox"></i><p>No sales for this day.</p></div>
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($salesForDay as $s): ?>
+                        <tr>
+                            <td class="text-muted"><?php echo date('H:i', strtotime($s['sale_datetime'])); ?></td>
+                            <td><?php echo htmlspecialchars($s['barber_name']); ?></td>
+                            <td><?php echo htmlspecialchars($s['service_name']); ?></td>
+                            <td class="text-end fw-semibold">₱<?php echo number_format((float)$s['price'], 2); ?></td>
+                            <td class="text-end">
+                                <a href="add_sale.php?day=<?php echo urlencode($day); ?>&edit=<?php echo (int)$s['id']; ?>" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-1" title="Delete" data-bs-toggle="modal" data-bs-target="#bbDeleteSaleModal" data-sale-id="<?php echo (int)$s['id']; ?>" data-sale-desc="<?php echo htmlspecialchars(date('H:i', strtotime($s['sale_datetime'])) . ' ' . $s['barber_name'] . ' – ' . $s['service_name'] . ' ₱' . number_format((float)$s['price'], 2)); ?>"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Delete sale confirmation modal -->
+<div class="modal fade" id="bbDeleteSaleModal" tabindex="-1" aria-labelledby="bbDeleteSaleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="bbDeleteSaleModalLabel"><i class="bi bi-trash text-danger me-1"></i> Delete sale?</h6>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-2 small">
+                <p class="mb-2" id="bbDeleteSaleDesc">This sale will be removed. Inventory will be restored.</p>
+                <p class="text-muted mb-0">This cannot be undone.</p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" id="bbDeleteSaleForm" class="d-inline">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="id" id="bbDeleteSaleId">
+                    <input type="hidden" name="day" value="<?php echo htmlspecialchars($day); ?>">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('bbDeleteSaleModal');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (e) {
+        var btn = e.relatedTarget;
+        if (!btn) return;
+        var id = btn.getAttribute('data-sale-id');
+        var desc = btn.getAttribute('data-sale-desc');
+        document.getElementById('bbDeleteSaleId').value = id || '';
+        var descEl = document.getElementById('bbDeleteSaleDesc');
+        if (descEl) descEl.textContent = desc ? ('Delete: ' + desc + '. Inventory will be restored.') : 'This sale will be removed. Inventory will be restored.';
+    });
+})();
+</script>
 
 <!-- Daily services breakdown drawer -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="bbBreakdownDrawer" aria-labelledby="bbBreakdownDrawerLabel" style="width: 100%; max-width: 700px;">

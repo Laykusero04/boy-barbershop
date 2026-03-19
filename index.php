@@ -583,12 +583,13 @@ if ($alertsOverflow > 0) {
                             <th>Barber</th>
                             <th>Service</th>
                             <th class="text-end">Price</th>
+                            <th class="text-end" style="width: 1%;">Actions</th>
                         </tr>
                         </thead>
                         <tbody>
                         <?php if (!$salesToday): ?>
                             <tr>
-                                <td colspan="4" class="p-0">
+                                <td colspan="5" class="p-0">
                                     <div class="bb-empty">
                                         <i class="bi bi-cart-x"></i>
                                         <p>No sales recorded yet today.</p>
@@ -603,6 +604,10 @@ if ($alertsOverflow > 0) {
                                     <td><?php echo htmlspecialchars($sale['barber_name']); ?></td>
                                     <td><?php echo htmlspecialchars($sale['service_name']); ?></td>
                                     <td class="text-end fw-semibold">₱<?php echo number_format($sale['price'], 2); ?></td>
+                                    <td class="text-end">
+                                        <a href="add_sale.php?day=<?php echo urlencode(date('Y-m-d')); ?>&edit=<?php echo (int)$sale['id']; ?>" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ms-1" title="Delete" data-bs-toggle="modal" data-bs-target="#bbDeleteSaleModal" data-sale-id="<?php echo (int)$sale['id']; ?>" data-sale-desc="<?php echo htmlspecialchars(date('H:i', strtotime($sale['sale_datetime'])) . ' ' . $sale['barber_name'] . ' – ' . $sale['service_name'] . ' ₱' . number_format($sale['price'], 2)); ?>"><i class="bi bi-trash"></i></button>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -836,5 +841,45 @@ if ($alertsOverflow > 0) {
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Delete sale confirmation modal (dashboard) -->
+<div class="modal fade" id="bbDeleteSaleModal" tabindex="-1" aria-labelledby="bbDeleteSaleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title" id="bbDeleteSaleModalLabel"><i class="bi bi-trash text-danger me-1"></i> Delete sale?</h6>
+                <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-2 small">
+                <p class="mb-2" id="bbDeleteSaleDesc">This sale will be removed. Inventory will be restored.</p>
+                <p class="text-muted mb-0">This cannot be undone.</p>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="post" action="add_sale.php" id="bbDeleteSaleForm" class="d-inline">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="id" id="bbDeleteSaleId">
+                    <input type="hidden" name="day" value="<?php echo htmlspecialchars(date('Y-m-d')); ?>">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('bbDeleteSaleModal');
+    if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (e) {
+        var btn = e.relatedTarget;
+        if (!btn) return;
+        var id = btn.getAttribute('data-sale-id');
+        var desc = btn.getAttribute('data-sale-desc');
+        document.getElementById('bbDeleteSaleId').value = id || '';
+        var descEl = document.getElementById('bbDeleteSaleDesc');
+        if (descEl) descEl.textContent = desc ? ('Delete: ' + desc + '. Inventory will be restored.') : 'This sale will be removed. Inventory will be restored.';
+    });
+})();
+</script>
 
 <?php include 'partials/footer.php'; ?>

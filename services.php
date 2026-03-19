@@ -11,19 +11,8 @@ try {
     // service_inventory_usage table may not exist yet
     $usageCountByService = [];
 }
-?>
-<?php include 'partials/header.php'; ?>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <div>
-        <h1 class="bb-page-title">Services</h1>
-        <p class="bb-page-subtitle">Add and manage services with default prices. Used when recording sales.</p>
-    </div>
-    <a href="services.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add service</a>
-</div>
-
-<?php
-// Handle create / update / deactivate
+// Handle create / update / deactivate (before any output so redirect works)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
     $name = trim($_POST['name'] ?? '');
@@ -93,6 +82,15 @@ if (isset($_GET['edit'])) {
 
 $services = $pdo->query('SELECT * FROM services ORDER BY is_active DESC, name')->fetchAll();
 ?>
+<?php include 'partials/header.php'; ?>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="bb-page-title">Services</h1>
+        <p class="bb-page-subtitle">Add and manage services with default prices. Used when recording sales.</p>
+    </div>
+    <a href="services.php" class="btn btn-sm btn-bb-primary"><i class="bi bi-plus-lg"></i> Add service</a>
+</div>
 
 <div class="row g-4">
     <div class="col-md-4">

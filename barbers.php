@@ -1,18 +1,7 @@
 <?php
 require 'connection.php';
-?>
-<?php include 'partials/header.php'; ?>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <div>
-        <h1 class="bb-page-title">Barbers</h1>
-        <p class="bb-page-subtitle">Manage barbers and their percentage share.</p>
-    </div>
-    <a href="#bbBarberForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-person-plus"></i> Add barber</a>
-</div>
-
-<?php
-// Handle create / update / deactivate
+// Handle create / update / deactivate (before any output so redirect works)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
     $name = trim($_POST['name'] ?? '');
@@ -50,6 +39,15 @@ if (isset($_GET['edit'])) {
 
 $barbers = $pdo->query('SELECT * FROM barbers ORDER BY is_active DESC, name')->fetchAll();
 ?>
+<?php include 'partials/header.php'; ?>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="bb-page-title">Barbers</h1>
+        <p class="bb-page-subtitle">Manage barbers and their percentage share.</p>
+    </div>
+    <a href="#bbBarberForm" class="btn btn-sm btn-bb-primary"><i class="bi bi-person-plus"></i> Add barber</a>
+</div>
 
 <div class="row g-4">
     <div class="col-md-4">
