@@ -26,11 +26,10 @@ try {
 }
 
 $message = null;
+$messageType = 'info'; // info, success, error (displayed as danger)
 $day = $_GET['day'] ?? date('Y-m-d');
 $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) ? $day : date('Y-m-d');
-if (isset($_GET['msg'])) {
-    $message = $_GET['msg'];
-}
+$highlightSaleId = isset($_GET['highlight']) && preg_match('/^\d+$/', (string)$_GET['highlight']) ? (int)$_GET['highlight'] : null;
 
 // Helper: restore inventory for a service (reverse of deduct)
 $restoreInventoryForService = function ($serviceId) use ($pdo) {
@@ -67,15 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $restoreInventoryForService((int)$sale['service_id']);
                 $pdo->prepare('DELETE FROM sales WHERE id = ?')->execute([$saleId]);
                 $pdo->commit();
-                $message = 'Sale deleted. Inventory restored.';
+                $_SESSION['flash'] = ['type' => 'success', 'text' => 'Sale deleted. Inventory restored.'];
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
-                $message = 'Error deleting sale: ' . htmlspecialchars($e->getMessage());
+                $_SESSION['flash'] = ['type' => 'error', 'text' => 'Error deleting sale: ' . $e->getMessage()];
             }
         } else {
-            $message = 'Sale not found.';
+            $_SESSION['flash'] = ['type' => 'error', 'text' => 'Sale not found.'];
         }
-        header('Location: add_sale.php?day=' . urlencode($redirectDay) . '&msg=' . urlencode($message));
+        header('Location: add_sale.php?day=' . urlencode($redirectDay));
         exit;
     }
 
@@ -96,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $existingSale = $existing->fetch();
         if (!$existingSale) {
             $message = 'Sale not found.';
+            $messageType = 'error';
         } else {
             $oldServiceId = (int)$existingSale['service_id'];
             try {
@@ -143,12 +143,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $pdo->commit();
                     $redirectDay = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['day'] ?? '') ? $_POST['day'] : date('Y-m-d');
-                    header('Location: add_sale.php?day=' . urlencode($redirectDay) . '&msg=' . urlencode('Sale updated.'));
+                    $_SESSION['flash'] = ['type' => 'success', 'text' => 'Sale updated.'];
+                    header('Location: add_sale.php?day=' . urlencode($redirectDay));
                     exit;
                 }
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
-                $message = 'Error updating sale: ' . htmlspecialchars($e->getMessage());
+                $message = 'Error updating sale: ' . $e->getMessage();
+                $messageType = 'error';
             }
         }
     }
@@ -178,7 +180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($insufficientItem !== null) {
                 $pdo->rollBack();
-                $message = 'Cannot add sale: insufficient stock for ' . htmlspecialchars($insufficientItem['item_name']) . ' (need ' . $insufficientItem['quantity_per_service'] . ', have ' . $insufficientItem['stock_qty'] . ').';
+                $message = 'Cannot add sale: insufficient stock for ' . $insufficientItem['item_name'] . ' (need ' . $insufficientItem['quantity_per_service'] . ', have ' . $insufficientItem['stock_qty'] . ').';
+                $messageType = 'error';
             } else {
                 if ($salesHasPromoColumns && ($promoId || $originalPrice !== null || $discountAmount !== null)) {
                     $stmt = $pdo->prepare('
@@ -200,7 +203,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 $pdo->commit();
-                $message = 'Sale added successfully.';
+                $newSaleId = (int)$pdo->lastInsertId();
+                $_SESSION['flash'] = ['type' => 'success', 'text' => 'Sale added successfully.'];
+                $redirectDay = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['day'] ?? '') ? $_POST['day'] : date('Y-m-d');
+                header('Location: add_sale.php?day=' . urlencode($redirectDay) . '&highlight=' . $newSaleId);
+                exit;
             }
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
@@ -214,13 +221,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt = $pdo->prepare('INSERT INTO sales (barber_id, service_id, price, payment_method, notes) VALUES (?, ?, ?, ?, ?)');
                     $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
                 }
-                $message = 'Sale added successfully. (Run files/sql/service_inventory_usage.sql to enable inventory deduction.)';
+                $newSaleId = (int)$pdo->lastInsertId();
+                $_SESSION['flash'] = ['type' => 'success', 'text' => 'Sale added successfully. (Run files/sql/service_inventory_usage.sql to enable inventory deduction.)'];
+                $redirectDay = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['day'] ?? '') ? $_POST['day'] : date('Y-m-d');
+                header('Location: add_sale.php?day=' . urlencode($redirectDay) . '&highlight=' . $newSaleId);
+                exit;
             } else {
-                $message = 'Error adding sale: ' . htmlspecialchars($e->getMessage());
+                $message = 'Error adding sale: ' . $e->getMessage();
+                $messageType = 'error';
             }
         }
     } elseif (!$saleId) {
         $message = 'Please fill all required fields.';
+        $messageType = 'info';
     }
 }
 
@@ -321,8 +334,12 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
 </div>
 
 <?php if ($message): ?>
-    <div class="alert alert-info py-2 small d-flex align-items-center gap-2 mb-3">
-        <i class="bi bi-check-circle-fill"></i>
+    <?php
+    $alertClass = $messageType === 'error' ? 'alert-danger' : ($messageType === 'success' ? 'alert-success' : 'alert-info');
+    $alertIcon = $messageType === 'error' ? 'bi-exclamation-triangle-fill' : ($messageType === 'success' ? 'bi-check-circle-fill' : 'bi-info-circle-fill');
+    ?>
+    <div class="alert <?php echo $alertClass; ?> py-2 small d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="bi <?php echo $alertIcon; ?>"></i>
         <?php echo htmlspecialchars($message); ?>
     </div>
 <?php endif; ?>
@@ -486,7 +503,8 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
                     </tr>
                 <?php else: ?>
                     <?php foreach ($salesForDay as $s): ?>
-                        <tr>
+                        <?php $rowId = (int)$s['id']; $isHighlight = ($highlightSaleId !== null && $highlightSaleId === $rowId); ?>
+                        <tr id="sale-row-<?php echo $rowId; ?>"<?php if ($isHighlight): ?> class="table-success bb-row-highlight"<?php endif; ?>>
                             <td class="text-muted"><?php echo date('H:i', strtotime($s['sale_datetime'])); ?></td>
                             <td><?php echo htmlspecialchars($s['barber_name']); ?></td>
                             <td><?php echo htmlspecialchars($s['service_name']); ?></td>
@@ -644,6 +662,19 @@ if (isset($_GET['edit']) && $_GET['edit'] !== '') {
     }
 })();
 </script>
+<?php if ($highlightSaleId): ?>
+<script>
+(function () {
+    var row = document.getElementById('sale-row-<?php echo $highlightSaleId; ?>');
+    if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setTimeout(function () {
+            row.classList.remove('table-success', 'bb-row-highlight');
+        }, 3500);
+    }
+})();
+</script>
+<?php endif; ?>
 <script>
 window.bbLastSale = <?php echo $lastSale ? json_encode($lastSale) : 'null'; ?>;
 

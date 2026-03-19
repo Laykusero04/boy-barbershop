@@ -469,6 +469,11 @@ body.bb-dark .bb-main .table-success th {
   color: var(--bb-text) !important;
 }
 
+.bb-main .bb-row-highlight td,
+.bb-main .bb-row-highlight th {
+  transition: background-color 0.6s ease-out;
+}
+
 html[data-bs-theme="dark"] .bb-main .table-light td,
 html[data-bs-theme="dark"] .bb-main .table-light th,
 body.bb-dark .bb-main .table-light td,

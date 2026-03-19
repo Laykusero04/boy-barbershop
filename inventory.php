@@ -2,6 +2,7 @@
 require 'connection.php';
 
 $message = null;
+$messageType = 'info';
 
 // Handle create/update/deactivate
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -22,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($itemName === '') {
         $message = 'Item name is required.';
+        $messageType = 'error';
     } else {
         if ($threshold < 0) $threshold = 0;
         if ($stockQty < 0) $stockQty = 0;
@@ -34,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ');
             $stmt->execute([$itemName, $stockQty, $threshold, ($unit !== '' ? $unit : null), $id]);
             $message = 'Item updated.';
+            $messageType = 'success';
         } else {
             $stmt = $pdo->prepare('
                 INSERT INTO inventory_items (item_name, stock_qty, low_stock_threshold, unit)
@@ -41,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ');
             $stmt->execute([$itemName, $stockQty, $threshold, ($unit !== '' ? $unit : null)]);
             $message = 'Item added.';
+            $messageType = 'success';
         }
     }
 }
@@ -68,7 +72,8 @@ $items = $pdo->query('SELECT * FROM inventory_items ORDER BY is_active DESC, ite
 </div>
 
 <?php if ($message): ?>
-    <div class="alert alert-info py-2 small d-flex align-items-center gap-2 mb-3"><i class="bi bi-check-circle-fill"></i><?php echo htmlspecialchars($message); ?></div>
+    <?php $alertClass = $messageType === 'error' ? 'alert-danger' : ($messageType === 'success' ? 'alert-success' : 'alert-info'); $alertIcon = $messageType === 'error' ? 'bi-exclamation-triangle-fill' : ($messageType === 'success' ? 'bi-check-circle-fill' : 'bi-info-circle-fill'); ?>
+    <div class="alert <?php echo $alertClass; ?> py-2 small d-flex align-items-center gap-2 mb-3" role="alert"><i class="bi <?php echo $alertIcon; ?>"></i><?php echo htmlspecialchars($message); ?></div>
 <?php endif; ?>
 
 <div class="row g-4">

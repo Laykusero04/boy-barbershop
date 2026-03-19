@@ -2,6 +2,7 @@
 require 'connection.php';
 
 $message = null;
+$messageType = 'info';
 
 // Helpers for settings
 function getSetting(PDO $pdo, string $key, ?string $default = null): ?string
@@ -32,17 +33,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     if ($target > 0) {
         try {
             setSetting($pdo, 'daily_target', (string)$target);
-            header('Location: analytics.php?section=peak&saved=1');
+            $_SESSION['flash'] = ['type' => 'success', 'text' => 'Daily target saved.'];
+            header('Location: analytics.php?section=peak');
             exit;
         } catch (Throwable $e) {
             $message = 'Unable to save target (settings table not set up yet).';
+            $messageType = 'error';
         }
     } else {
         $message = 'Please enter a target greater than 0.';
+        $messageType = 'info';
     }
-}
-if (isset($_GET['saved']) && $_GET['saved'] === '1') {
-    $message = 'Daily target saved.';
 }
 
 $dailyTarget = (float)(getSetting($pdo, 'daily_target', '0') ?? '0');
@@ -169,7 +170,8 @@ $section = isset($_GET['section']) && $_GET['section'] === 'activity' ? 'activit
 </div>
 
 <?php if ($message): ?>
-    <div class="alert alert-info py-2 small d-flex align-items-center gap-2 mb-3"><i class="bi bi-check-circle-fill"></i><?php echo htmlspecialchars($message); ?></div>
+    <?php $alertClass = $messageType === 'error' ? 'alert-danger' : ($messageType === 'success' ? 'alert-success' : 'alert-info'); $alertIcon = $messageType === 'error' ? 'bi-exclamation-triangle-fill' : ($messageType === 'success' ? 'bi-check-circle-fill' : 'bi-info-circle-fill'); ?>
+    <div class="alert <?php echo $alertClass; ?> py-2 small d-flex align-items-center gap-2 mb-3" role="alert"><i class="bi <?php echo $alertIcon; ?>"></i><?php echo htmlspecialchars($message); ?></div>
 <?php endif; ?>
 
 <?php if ($section === 'activity'): ?>

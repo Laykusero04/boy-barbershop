@@ -156,3 +156,13 @@ function bb_breadcrumbs(): array {
                             ?>
                         </ol>
                     </nav>
+                    <?php
+                    if (!empty($_SESSION['flash'])) {
+                        $flash = $_SESSION['flash'];
+                        $type = ($flash['type'] ?? 'info') === 'error' ? 'danger' : ($flash['type'] ?? 'info');
+                        $cls = in_array($type, ['success', 'danger', 'info', 'warning'], true) ? 'alert-' . $type : 'alert-info';
+                        $icon = $type === 'success' ? 'bi-check-circle-fill' : ($type === 'danger' ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill');
+                        echo '<div class="alert ' . $cls . ' py-2 small d-flex align-items-center gap-2 mb-3" role="alert"><i class="bi ' . $icon . '"></i>' . htmlspecialchars($flash['text'] ?? '') . '</div>';
+                        unset($_SESSION['flash']);
+                    }
+                    ?>

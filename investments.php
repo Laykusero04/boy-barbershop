@@ -2,6 +2,7 @@
 require 'connection.php';
 
 $message = null;
+$messageType = 'info';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $itemName = trim($_POST['item_name'] ?? '');
@@ -19,8 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $investmentDate !== '' ? $investmentDate : null,
         ]);
         $message = 'Investment item added successfully.';
+        $messageType = 'success';
     } else {
         $message = 'Please fill all required fields.';
+        $messageType = 'info';
     }
 }
 
@@ -54,7 +57,8 @@ try {
 </div>
 
 <?php if ($message): ?>
-    <div class="alert alert-info py-2 small d-flex align-items-center gap-2 mb-3"><i class="bi bi-check-circle-fill"></i><?php echo htmlspecialchars($message); ?></div>
+    <?php $alertClass = $messageType === 'success' ? 'alert-success' : 'alert-info'; $alertIcon = $messageType === 'success' ? 'bi-check-circle-fill' : 'bi-info-circle-fill'; ?>
+    <div class="alert <?php echo $alertClass; ?> py-2 small d-flex align-items-center gap-2 mb-3" role="alert"><i class="bi <?php echo $alertIcon; ?>"></i><?php echo htmlspecialchars($message); ?></div>
 <?php endif; ?>
 
 <div class="row g-4">

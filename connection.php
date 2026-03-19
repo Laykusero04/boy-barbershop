@@ -4,6 +4,10 @@
 // Use shop timezone so "today" and sale times match your location (Philippines)
 date_default_timezone_set('Asia/Manila');
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $host = 'localhost';
 $dbname = 'boy_barbershop';
 $username = 'root';
