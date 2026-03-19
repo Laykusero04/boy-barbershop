@@ -12,6 +12,19 @@ try {
 }
 $defaultPaymentMethod = $paymentMethods[0]['name'] ?? null;
 
+// Promos: active and valid for today (between valid_from and valid_to)
+$salesHasPromoColumns = false;
+$promos = [];
+try {
+    $pdo->query('SELECT promo_id FROM sales LIMIT 1');
+    $salesHasPromoColumns = true;
+    $today = date('Y-m-d');
+    $stmt = $pdo->prepare('SELECT id, name, promo_type, value FROM promos WHERE is_active = 1 AND ? BETWEEN valid_from AND valid_to ORDER BY name');
+    $stmt->execute([$today]);
+    $promos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+}
+
 $message = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -20,8 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $price = (float)($_POST['price'] ?? 0);
     $paymentMethod = trim((string)($_POST['payment_method'] ?? ''));
     $notes = trim($_POST['notes'] ?? '');
+    $promoId = isset($_POST['promo_id']) && $_POST['promo_id'] !== '' ? (int)$_POST['promo_id'] : null;
+    $originalPrice = isset($_POST['original_price']) && $_POST['original_price'] !== '' ? (float)$_POST['original_price'] : null;
+    $discountAmount = isset($_POST['discount_amount']) && $_POST['discount_amount'] !== '' ? (float)$_POST['discount_amount'] : null;
 
-    if ($barberId && $serviceId && $price > 0) {
+    if ($barberId && $serviceId && $price >= 0) {
         try {
             $pdo->beginTransaction();
 
@@ -49,11 +65,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->rollBack();
                 $message = 'Cannot add sale: insufficient stock for ' . htmlspecialchars($insufficientItem['item_name']) . ' (need ' . $insufficientItem['quantity_per_service'] . ', have ' . $insufficientItem['stock_qty'] . ').';
             } else {
-                $stmt = $pdo->prepare('
-                    INSERT INTO sales (barber_id, service_id, price, payment_method, notes)
-                    VALUES (?, ?, ?, ?, ?)
-                ');
-                $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
+                if ($salesHasPromoColumns && ($promoId || $originalPrice !== null || $discountAmount !== null)) {
+                    $stmt = $pdo->prepare('
+                        INSERT INTO sales (barber_id, service_id, price, payment_method, notes, promo_id, original_price, discount_amount)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ');
+                    $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes, $promoId ?: null, $originalPrice, $discountAmount]);
+                } else {
+                    $stmt = $pdo->prepare('
+                        INSERT INTO sales (barber_id, service_id, price, payment_method, notes)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
+                }
 
                 $deductStmt = $pdo->prepare('UPDATE inventory_items SET stock_qty = stock_qty - ? WHERE id = ?');
                 foreach ($usages as $u) {
@@ -68,8 +92,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->rollBack();
             }
             if (strpos($e->getMessage(), 'service_inventory_usage') !== false || strpos($e->getMessage(), "doesn't exist") !== false) {
-                $stmt = $pdo->prepare('INSERT INTO sales (barber_id, service_id, price, payment_method, notes) VALUES (?, ?, ?, ?, ?)');
-                $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
+                if ($salesHasPromoColumns && ($promoId || $originalPrice !== null || $discountAmount !== null)) {
+                    $stmt = $pdo->prepare('INSERT INTO sales (barber_id, service_id, price, payment_method, notes, promo_id, original_price, discount_amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+                    $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes, $promoId ?: null, $originalPrice, $discountAmount]);
+                } else {
+                    $stmt = $pdo->prepare('INSERT INTO sales (barber_id, service_id, price, payment_method, notes) VALUES (?, ?, ?, ?, ?)');
+                    $stmt->execute([$barberId, $serviceId, $price, $paymentMethod, $notes]);
+                }
                 $message = 'Sale added successfully. (Run files/sql/service_inventory_usage.sql to enable inventory deduction.)';
             } else {
                 $message = 'Error adding sale: ' . htmlspecialchars($e->getMessage());
@@ -209,19 +238,42 @@ if ($lastSaleRow) {
                 </select>
             </div>
             <div class="col-md-4">
-                <label class="form-label"><i class="bi bi-currency-exchange text-muted me-1"></i> Price</label>
+                <label class="form-label"><i class="bi bi-currency-exchange text-muted me-1"></i> Price (amount to charge)</label>
                 <input
                     type="number"
                     name="price"
+                    id="bbPriceInput"
                     class="form-control form-control-sm"
                     step="0.01"
                     min="0"
                     required
                 >
+                <input type="hidden" name="original_price" id="bbOriginalPrice">
+                <input type="hidden" name="discount_amount" id="bbDiscountAmount">
                 <div class="form-text small">
-                    Auto-fills from service, but editable.
+                    Auto-fills from service. With a promo selected, updates to discounted amount.
                 </div>
             </div>
+            <?php if ($salesHasPromoColumns && !empty($promos)): ?>
+            <div class="col-md-4">
+                <label class="form-label"><i class="bi bi-tag text-muted me-1"></i> Promo</label>
+                <select name="promo_id" id="bbPromoSelect" class="form-select form-select-sm">
+                    <option value="">— No promo —</option>
+                    <?php foreach ($promos as $pr): ?>
+                        <option value="<?php echo (int)$pr['id']; ?>"
+                            data-type="<?php echo htmlspecialchars($pr['promo_type']); ?>"
+                            data-value="<?php echo htmlspecialchars($pr['value']); ?>">
+                            <?php echo htmlspecialchars($pr['name']); ?>
+                            (<?php
+                            if ($pr['promo_type'] === 'free') echo 'Free';
+                            elseif ($pr['promo_type'] === 'percent_off') echo (float)$pr['value'] . '% off';
+                            else echo '₱' . number_format((float)$pr['value'], 0) . ' off';
+                            ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
             <div class="col-md-4">
                 <label class="form-label"><i class="bi bi-wallet2 text-muted me-1"></i> Payment method</label>
                 <select name="payment_method" class="form-select form-select-sm">
@@ -378,12 +430,46 @@ window.bbLastSale = <?php echo $lastSale ? json_encode($lastSale) : 'null'; ?>;
         barberSelect.focus();
     }
 
-    // Auto-fill price when service changes
+    // Auto-fill price when service changes; store as original for promo calculation
     serviceSelect.addEventListener('change', function () {
         var opt = this.options[this.selectedIndex];
         var price = opt.getAttribute('data-price');
         if (price) priceInput.value = price;
+        var origInput = form.querySelector('input[name="original_price"]');
+        if (origInput) origInput.value = price || '';
+        applyPromoToPrice(form);
     });
+
+    // When promo changes, recalculate final price from original
+    var promoSelect = form.querySelector('select[name="promo_id"]');
+    if (promoSelect) {
+        promoSelect.addEventListener('change', function () { applyPromoToPrice(form); });
+    }
+
+    function applyPromoToPrice(f) {
+        var priceIn = f.querySelector('input[name="price"]');
+        var origIn = f.querySelector('input[name="original_price"]');
+        var discIn = f.querySelector('input[name="discount_amount"]');
+        var promoSel = f.querySelector('select[name="promo_id"]');
+        if (!priceIn || !origIn || !discIn) return;
+        var original = parseFloat(priceIn.value) || parseFloat(origIn.value) || 0;
+        if (original && !origIn.value) origIn.value = String(original);
+        if (!promoSel || promoSel.value === '') {
+            discIn.value = '';
+            origIn.value = '';
+            return;
+        }
+        var opt = promoSel.options[promoSel.selectedIndex];
+        var type = opt.getAttribute('data-type');
+        var val = parseFloat(opt.getAttribute('data-value')) || 0;
+        var finalPrice = original;
+        if (type === 'percent_off') finalPrice = Math.max(0, original * (1 - val / 100));
+        else if (type === 'amount_off') finalPrice = Math.max(0, original - val);
+        else if (type === 'free') finalPrice = 0;
+        priceIn.value = (Math.round(finalPrice * 100) / 100).toFixed(2);
+        origIn.value = String(original);
+        discIn.value = (Math.round((original - finalPrice) * 100) / 100).toFixed(2);
+    }
 
     // Repeat last sale: fill form and submit
     var repeatBtn = document.getElementById('bbRepeatLastBtn');

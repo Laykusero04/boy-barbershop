@@ -90,6 +90,23 @@ $stmt = $pdo->prepare('
 ');
 $stmt->execute([$fromDt, $toDt]);
 $payroll = $stmt->fetchAll();
+
+// Revenue by promo (if promos table and sales.promo_id exist)
+$revenueByPromo = [];
+try {
+    $pdo->query('SELECT promo_id FROM sales LIMIT 1');
+    $stmt = $pdo->prepare('
+        SELECT p.name AS promo_name, COUNT(s.id) AS sale_count, COALESCE(SUM(s.price), 0) AS revenue
+        FROM sales s
+        JOIN promos p ON s.promo_id = p.id
+        WHERE s.sale_datetime BETWEEN ? AND ?
+        GROUP BY p.id, p.name
+        ORDER BY revenue DESC
+    ');
+    $stmt->execute([$fromDt, $toDt]);
+    $revenueByPromo = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+}
 ?>
 
 <?php include 'partials/header.php'; ?>
@@ -200,6 +217,34 @@ $payroll = $stmt->fetchAll();
         </div>
     </div>
 </div>
+
+<?php if (!empty($revenueByPromo)): ?>
+<div class="bb-section-card card mb-3">
+    <div class="card-body">
+        <h5 class="bb-section-title mb-3"><i class="bi bi-tag"></i> Revenue by promo</h5>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>Promo</th>
+                    <th class="text-end">Sales count</th>
+                    <th class="text-end">Revenue</th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($revenueByPromo as $r): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($r['promo_name']); ?></td>
+                        <td class="text-end"><?php echo (int)$r['sale_count']; ?></td>
+                        <td class="text-end">₱<?php echo number_format((float)$r['revenue'], 2); ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="bb-section-card card">
     <div class="card-body">

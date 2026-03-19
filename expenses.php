@@ -138,6 +138,27 @@ if ($hasExpenseType) {
     }
 }
 $fixedVarTotal = $fixedVariable['fixed'] + $fixedVariable['variable'] + $fixedVariable['uncategorized'];
+
+// Average monthly expenses (expected spending) from last 12 months
+$avgMonthlyExpenses = 0;
+$expenseMonthCount = 0;
+$stmt = $pdo->prepare("
+    SELECT DATE_FORMAT(expense_date, '%Y-%m') AS ym, SUM(amount) AS total
+    FROM expenses
+    WHERE expense_date >= ?
+    GROUP BY ym
+    ORDER BY ym DESC
+    LIMIT 12
+");
+$stmt->execute([$periodStart]);
+$monthlyTotals = [];
+while ($row = $stmt->fetch()) {
+    $monthlyTotals[] = (float)$row['total'];
+}
+if (!empty($monthlyTotals)) {
+    $expenseMonthCount = count($monthlyTotals);
+    $avgMonthlyExpenses = array_sum($monthlyTotals) / $expenseMonthCount;
+}
 ?>
 
 <?php include 'partials/header.php'; ?>
@@ -156,6 +177,14 @@ $fixedVarTotal = $fixedVariable['fixed'] + $fixedVariable['variable'] + $fixedVa
     <div class="card-body">
         <h5 class="bb-section-title mb-3"><i class="bi bi-graph-up"></i> Expense intelligence</h5>
         <p class="text-muted small mb-3">Category breakdown, monthly comparison, and fixed vs variable to help control costs. Based on last 12 months unless noted.</p>
+
+        <?php if ($expenseMonthCount > 0): ?>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3 p-3 rounded bg-warning bg-opacity-10 border border-warning border-opacity-25">
+            <span class="small text-muted">Expected monthly expenses (avg):</span>
+            <strong class="h5 mb-0">₱<?php echo number_format($avgMonthlyExpenses, 2); ?></strong>
+            <span class="small text-muted">from <?php echo $expenseMonthCount; ?> month(s) of data</span>
+        </div>
+        <?php endif; ?>
 
         <div class="row g-4">
             <!-- Categories summary: % of total -->

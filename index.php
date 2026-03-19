@@ -774,21 +774,28 @@ if ($alertsOverflow > 0) {
             <p class="mb-0 text-muted">Record more <a href="add_sale.php">sales</a> and <a href="expenses.php">expenses</a> to see suggestions here.</p>
         <?php else: ?>
             <div class="row g-3 mb-3">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <div class="p-3 rounded bg-warning bg-opacity-10 border border-warning border-opacity-25">
+                        <div class="small text-muted mb-1">Expected monthly expenses</div>
+                        <div class="h5 mb-0">₱<?php echo number_format($avgMonthlyExpenses, 2); ?></div>
+                        <div class="small text-muted">Avg from last <?php echo $insightMonthCount; ?> month(s)</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
                     <div class="p-3 rounded bb-insight-card bb-insight-card-neutral">
                         <div class="small text-muted mb-1">Average monthly net profit</div>
                         <div class="h5 mb-0">₱<?php echo number_format($avgMonthlyProfit, 2); ?></div>
                         <div class="small text-muted">(sales − barber share − expenses)</div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="p-3 rounded bg-success bg-opacity-10 border border-success border-opacity-25">
                         <div class="small text-muted mb-1">Suggested monthly owner pay</div>
                         <div class="h5 mb-0 text-success">₱<?php echo number_format($suggestedOwnerPay, 2); ?></div>
                         <div class="small text-muted"><?php echo (int)$ownerPayPercent; ?>% of avg profit<?php echo $ownerPayPercent === 70 ? ' (default buffer)' : ''; ?></div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="p-3 rounded bg-primary bg-opacity-10 border border-primary border-opacity-25">
                         <div class="small text-muted mb-1">Estimated time to recover investment</div>
                         <?php if ($paybackFormatted !== null): ?>

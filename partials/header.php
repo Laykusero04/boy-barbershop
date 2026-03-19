@@ -106,6 +106,9 @@ $darkMode = (bb_get_setting($pdo, 'dark_mode', '0') ?? '0') === '1';
                         <a href="payment_methods.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'payment_methods.php' ? 'active' : ''; ?>">
                             <i class="bi bi-wallet2"></i><span>Payment methods</span>
                         </a>
+                        <a href="promos.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'promos.php' ? 'active' : ''; ?>">
+                            <i class="bi bi-tag"></i><span>Promos</span>
+                        </a>
                         <a href="cash_flow.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'cash_flow.php' ? 'active' : ''; ?>">
                             <i class="bi bi-cash-stack"></i><span>Cash flow</span>
                         </a>
